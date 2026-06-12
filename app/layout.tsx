@@ -2,29 +2,14 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Clip Vault — Hidden Gem Media",
-  description:
-    "Pull any Instagram or Facebook clip straight into Google Drive. Video or audio, one link.",
+  title: "AI Video Analyser · Hidden Gem Media",
+  description: "Drop a video. Get competitive intel or client insights back in seconds.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="font-body bg-paper text-ink antialiased">{children}</body>
+      <body>{children}</body>
     </html>
   );
 }

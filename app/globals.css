@@ -1,51 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Timecode ruler — repeating tick marks, the page's signature device */
-.ruler {
-  background-image: repeating-linear-gradient(
-    to right,
-    #c3cfc8 0,
-    #c3cfc8 1px,
-    transparent 1px,
-    transparent 10px
-  );
-}
-.ruler-major {
-  background-image: repeating-linear-gradient(
-    to right,
-    #9db1a7 0,
-    #9db1a7 1.5px,
-    transparent 1.5px,
-    transparent 80px
-  );
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  --bg: #FFFFFF;
+  --surface: #F7F7F8;
+  --surface2: #EFEFEF;
+  --border: rgba(0,0,0,0.08);
+  --border-bright: rgba(0,0,0,0.14);
+  --text: #0A0A0A;
+  --muted: #888888;
+  --active-color: #6366F1;
+  --active-glow: rgba(99,102,241,0.15);
 }
 
-/* Playhead pulse while a job is running */
-@keyframes playhead-blink {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
-.playhead {
-  animation: playhead-blink 1.1s ease-in-out infinite;
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .playhead {
-    animation: none;
-  }
-  * {
-    transition-duration: 0.01ms !important;
-  }
+/* Background grid */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
 }
 
-:focus-visible {
-  outline: 2px solid #0e7c56;
-  outline-offset: 2px;
+.font-mono, code, pre { font-family: 'JetBrains Mono', monospace; }
+
+/* Scan beam animation */
+@keyframes scan {
+  0%   { left: -60%; }
+  100% { left: 160%; }
+}
+
+/* Pulse dot */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.6; transform: scale(0.8); }
+}
+
+/* Blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
 }
