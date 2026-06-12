@@ -7,15 +7,16 @@ import { useCallback, useRef, useState } from "react";
 /* ------------------------------------------------------------------ */
 
 type InputMode = "link" | "upload";
-type JobState = "idle" | "running" | "done" | "error";
+type JobState  = "idle" | "running" | "done" | "error";
 
 type Stage = { label: string; detail: string };
 const STAGES: Stage[] = [
-  { label: "Load",     detail: "Reading video source"     },
-  { label: "Process",  detail: "Saving to Google Drive"   },
-  { label: "Analyse",  detail: "Running video analysis"   },
+  { label: "Load",    detail: "Reading video source"   },
+  { label: "Process", detail: "Saving to Google Drive" },
+  { label: "Analyse", detail: "Running video analysis" },
 ];
 
+const WEBHOOK_URL = "https://n8n.srv1597665.hstgr.cloud/webhook/instagram-analyser";
 const DRIVE_FOLDER = { name: "Competitor Clips", id: "1_xWEffueiPstS1vhal24THu-S21fM_SB" };
 
 type RecentItem = {
@@ -26,9 +27,9 @@ type RecentItem = {
 };
 
 const SEED_RECENTS: RecentItem[] = [
-  { name: "mirrored-cabin-giveaway.mp4", source: "Drive link", size: "24.1 MB", time: "Today · 7:42 PM"      },
-  { name: "hot-tub-sunset-reel.mp4",     source: "Upload",     size: "18.7 MB", time: "Today · 6:15 PM"      },
-  { name: "lakehouse-walkthrough.mp4",   source: "Drive link", size: "31.2 MB", time: "Yesterday · 2:08 PM"  },
+  { name: "mirrored-cabin-giveaway.mp4", source: "Drive link", size: "24.1 MB", time: "Today · 7:42 PM"     },
+  { name: "hot-tub-sunset-reel.mp4",     source: "Upload",     size: "18.7 MB", time: "Today · 6:15 PM"     },
+  { name: "lakehouse-walkthrough.mp4",   source: "Drive link", size: "31.2 MB", time: "Yesterday · 2:08 PM" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -56,17 +57,19 @@ function formatBytes(bytes: number) {
 /* ------------------------------------------------------------------ */
 
 export default function Page() {
-  const [mode, setMode]         = useState<InputMode>("link");
-  const [link, setLink]         = useState("");
-  const [file, setFile]         = useState<File | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const [job, setJob]           = useState<JobState>("idle");
+  const [mode, setMode]           = useState<InputMode>("link");
+  const [link, setLink]           = useState("");
+  const [file, setFile]           = useState<File | null>(null);
+  const [dragging, setDragging]   = useState(false);
+  const [job, setJob]             = useState<JobState>("idle");
   const [stageIndex, setStageIndex] = useState(-1);
-  const [error, setError]       = useState<string | null>(null);
+  const [error, setError]         = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
-  const [recents, setRecents]   = useState<RecentItem[]>(SEED_RECENTS);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const timers  = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [analysis, setAnalysis]   = useState<Record<string, unknown> | null>(null);
+  const [recents, setRecents]     = useState<RecentItem[]>(SEED_RECENTS);
+  const fileRef    = useRef<HTMLInputElement>(null);
+  const abortRef   = useRef<AbortController | null>(null);
+  const timers     = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const progressPct =
     job === "idle" ? 0 :
@@ -74,15 +77,17 @@ export default function Page() {
     Math.min(((stageIndex + 0.6) / STAGES.length) * 100, 96);
 
   const reset = useCallback(() => {
+    abortRef.current?.abort();
     timers.current.forEach(clearTimeout);
     timers.current = [];
     setJob("idle");
     setStageIndex(-1);
     setError(null);
     setLastSaved(null);
+    setAnalysis(null);
   }, []);
 
-  const startJob = useCallback(() => {
+  const startJob = useCallback(async () => {
     if (mode === "link") {
       const check = validateDriveLink(link);
       if (!check.ok) { setError(check.error ?? "Invalid link."); return; }
@@ -92,36 +97,74 @@ export default function Page() {
 
     setError(null);
     setLastSaved(null);
+    setAnalysis(null);
     setJob("running");
     setStageIndex(0);
 
-    /* TODO: replace simulation with real API call
-       POST /api/analyse  { link } or multipart upload
-       Stream SSE stage updates back, then return { name, driveUrl }
-    */
-    const stepMs = 1600;
+    // Advance stage indicators while waiting for the webhook
+    const stepMs = 2000;
     STAGES.forEach((_, i) => {
       timers.current.push(setTimeout(() => setStageIndex(i), i * stepMs));
     });
-    timers.current.push(
-      setTimeout(() => {
-        setJob("done");
-        setStageIndex(STAGES.length);
-        const name = mode === "upload" && file
-          ? file.name
-          : (link.split("/").find(s => s.length > 10 && !s.includes(".")) ?? "clip") + ".mp4";
-        setLastSaved(name);
-        setRecents(r => [{
-          name,
-          source: mode === "link" ? "Drive link" : "Upload",
-          size: mode === "upload" && file ? formatBytes(file.size) : "—",
-          time: "Just now",
-        }, ...r]);
-      }, STAGES.length * stepMs)
-    );
+
+    try {
+      abortRef.current = new AbortController();
+
+      let body: BodyInit;
+      let headers: Record<string, string> = {};
+
+      if (mode === "link") {
+        body = JSON.stringify({ url: link });
+        headers["Content-Type"] = "application/json";
+      } else {
+        // File upload — send as multipart so n8n can receive the binary
+        const fd = new FormData();
+        fd.append("file", file!);
+        body = fd;
+      }
+
+      const res = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers,
+        body,
+        signal: abortRef.current.signal,
+      });
+
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Webhook returned ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      const name =
+        (data.fileName as string) ||
+        (data.name as string) ||
+        (mode === "upload" && file ? file.name : link.split("/d/")[1]?.split("/")[0] ?? "clip") + ".mp4";
+
+      setJob("done");
+      setStageIndex(STAGES.length);
+      setLastSaved(name);
+      setAnalysis(data);
+      setRecents(r => [{
+        name,
+        source: mode === "link" ? "Drive link" : "Upload",
+        size: mode === "upload" && file ? formatBytes(file.size) : "—",
+        time: "Just now",
+      }, ...r]);
+
+    } catch (err: unknown) {
+      timers.current.forEach(clearTimeout);
+      if (err instanceof Error && err.name === "AbortError") return;
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setJob("error");
+    }
   }, [mode, link, file]);
 
-  /* Drag-and-drop handlers */
+  /* Drag-and-drop */
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
@@ -152,7 +195,7 @@ export default function Page() {
           Any clip.<br />Straight to Drive.
         </h1>
         <p className="mt-4 text-base text-mist">
-          Paste a Google Drive link or upload a video. Get it saved and analysed, seconds later.
+          Paste a Google Drive link or upload a video — get it saved and analysed in seconds.
         </p>
       </div>
 
@@ -176,7 +219,7 @@ export default function Page() {
           ))}
         </div>
 
-        {/* Link input */}
+        {/* Drive link input */}
         {mode === "link" && (
           <div className="flex flex-col gap-3 sm:flex-row">
             <input
@@ -203,11 +246,9 @@ export default function Page() {
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
               className={`flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-sm transition-colors ${
-                dragging
-                  ? "border-emerald bg-emerald/5"
-                  : file
-                  ? "border-emerald/40 bg-emerald/5"
-                  : "border-line bg-white hover:border-mist"
+                dragging        ? "border-emerald bg-emerald/5" :
+                file            ? "border-emerald/40 bg-emerald/5" :
+                                  "border-line bg-white hover:border-mist"
               }`}
             >
               {file ? (
@@ -252,28 +293,24 @@ export default function Page() {
       {/* Pipeline */}
       <section className="mt-6" aria-live="polite">
         <div className="overflow-hidden rounded-2xl border border-line bg-card">
-          {/* Progress bar */}
           <div className="relative h-1 bg-line">
             <div
               className="absolute inset-y-0 left-0 bg-emerald transition-[width] duration-700 ease-out"
               style={{ width: `${progressPct}%` }}
             />
           </div>
-
-          {/* Stages */}
           <div className="grid grid-cols-3 divide-x divide-line">
             {STAGES.map((s, i) => {
               const state =
-                job === "idle" ? "idle"
-                : i < stageIndex || job === "done" ? "done"
-                : i === stageIndex ? "active"
-                : "idle";
+                job === "idle" ? "idle" :
+                i < stageIndex || job === "done" ? "done" :
+                i === stageIndex ? "active" : "idle";
               return (
                 <div key={s.label} className={`flex items-center gap-3 px-5 py-4 ${state === "active" ? "bg-emerald/5" : ""}`}>
                   <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                    state === "done"   ? "bg-emerald text-white"
-                    : state === "active" ? "border-2 border-emerald text-emerald"
-                    : "border border-line text-mist"
+                    state === "done"   ? "bg-emerald text-white" :
+                    state === "active" ? "border-2 border-emerald text-emerald" :
+                                        "border border-line text-mist"
                   }`}>
                     {state === "done" ? "✓" : i + 1}
                   </span>
@@ -307,6 +344,16 @@ export default function Page() {
         )}
       </section>
 
+      {/* Analysis results */}
+      {analysis && (
+        <section className="mt-6">
+          <h2 className="mb-3 font-display text-base font-semibold">Analysis</h2>
+          <div className="rounded-2xl border border-line bg-card p-5">
+            <AnalysisView data={analysis} />
+          </div>
+        </section>
+      )}
+
       {/* Recent */}
       <section className="mt-10">
         <h2 className="mb-3 font-display text-base font-semibold">Recent</h2>
@@ -338,6 +385,32 @@ export default function Page() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Analysis display — renders whatever shape n8n returns              */
+/* ------------------------------------------------------------------ */
+
+function AnalysisView({ data }: { data: Record<string, unknown> }) {
+  // If n8n returns a plain string field called "analysis" or "result", show it nicely
+  const textField =
+    (data.analysis as string) ||
+    (data.result as string) ||
+    (data.summary as string) ||
+    (data.output as string);
+
+  if (textField) {
+    return (
+      <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">{textField}</p>
+    );
+  }
+
+  // Fallback: pretty-print the raw JSON so we can see what n8n is returning
+  return (
+    <pre className="overflow-x-auto rounded-lg bg-paper p-4 text-xs leading-relaxed text-ink">
+      {JSON.stringify(data, null, 2)}
+    </pre>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Sub-components                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -345,20 +418,16 @@ function SubmitButton({ job, canSubmit, onStart, onReset, onNew }: {
   job: JobState; canSubmit: boolean;
   onStart: () => void; onReset: () => void; onNew: () => void;
 }) {
-  if (job === "running") {
-    return (
-      <button onClick={onReset} className="rounded-xl border border-line bg-white px-6 py-3 text-sm font-semibold text-ink hover:border-mist sm:self-start">
-        Cancel
-      </button>
-    );
-  }
-  if (job === "done") {
-    return (
-      <button onClick={onNew} className="rounded-xl bg-pine px-6 py-3 text-sm font-semibold text-white hover:bg-ink sm:self-start">
-        New clip
-      </button>
-    );
-  }
+  if (job === "running") return (
+    <button onClick={onReset} className="rounded-xl border border-line bg-white px-6 py-3 text-sm font-semibold text-ink hover:border-mist sm:self-start">
+      Cancel
+    </button>
+  );
+  if (job === "done") return (
+    <button onClick={onNew} className="rounded-xl bg-pine px-6 py-3 text-sm font-semibold text-white hover:bg-ink sm:self-start">
+      New clip
+    </button>
+  );
   return (
     <button
       onClick={onStart}
