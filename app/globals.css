@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Timecode ruler — repeating tick marks, the page's signature device */
+.ruler {
+  background-image: repeating-linear-gradient(
+    to right,
+    #c3cfc8 0,
+    #c3cfc8 1px,
+    transparent 1px,
+    transparent 10px
+  );
+}
+.ruler-major {
+  background-image: repeating-linear-gradient(
+    to right,
+    #9db1a7 0,
+    #9db1a7 1.5px,
+    transparent 1.5px,
+    transparent 80px
+  );
+}
+
+/* Playhead pulse while a job is running */
+@keyframes playhead-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.playhead {
+  animation: playhead-blink 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playhead {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid #0e7c56;
+  outline-offset: 2px;
+}
