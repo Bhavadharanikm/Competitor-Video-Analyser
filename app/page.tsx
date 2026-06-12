@@ -16,7 +16,7 @@ const STAGES: Stage[] = [
   { label: "Analyse", detail: "Running video analysis" },
 ];
 
-const WEBHOOK_URL = "https://n8n.srv1597665.hstgr.cloud/webhook/instagram-analyser";
+const WEBHOOK_URL = "/api/analyse";
 const DRIVE_FOLDER = { name: "Competitor Clips", id: "1_xWEffueiPstS1vhal24THu-S21fM_SB" };
 
 type RecentItem = {
