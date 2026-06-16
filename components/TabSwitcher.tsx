@@ -2,7 +2,7 @@
 import { useRef, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
-export type Tab = "competitor" | "client";
+export type Tab = "competitor" | "client" | "automation";
 
 interface Props {
   active: Tab;
@@ -12,16 +12,20 @@ interface Props {
 const tabs: { id: Tab; label: string }[] = [
   { id: "competitor", label: "🎯 Competitor Analyser" },
   { id: "client",     label: "✨ Client Analyser"     },
+  { id: "automation", label: "⚡ Video Automation"    },
 ];
 
 export default function TabSwitcher({ active, onChange }: Props) {
-  const compRef = useRef<HTMLButtonElement>(null);
-  const clientRef = useRef<HTMLButtonElement>(null);
+  const compRef       = useRef<HTMLButtonElement>(null);
+  const clientRef     = useRef<HTMLButtonElement>(null);
+  const automationRef = useRef<HTMLButtonElement>(null);
+  const refs = [compRef, clientRef, automationRef];
   const [pill, setPill] = useState({ x: 0, w: 0 });
 
   useEffect(() => {
-    const ref = active === "competitor" ? compRef : clientRef;
-    if (ref.current) {
+    const idx = tabs.findIndex((t) => t.id === active);
+    const ref = refs[idx];
+    if (ref?.current) {
       const btn = ref.current;
       const parent = btn.parentElement!;
       const parentRect = parent.getBoundingClientRect();
@@ -30,8 +34,12 @@ export default function TabSwitcher({ active, onChange }: Props) {
     }
   }, [active]);
 
-  const activeColor  = active === "competitor" ? "#6366F1" : "#00D4A0";
-  const activeGlow   = active === "competitor" ? "rgba(99,102,241,0.25)" : "rgba(0,212,160,0.22)";
+  const activeColor =
+    active === "competitor" ? "#6366F1" :
+    active === "client"     ? "#00D4A0" : "#F59E0B";
+  const activeGlow =
+    active === "competitor" ? "rgba(99,102,241,0.25)" :
+    active === "client"     ? "rgba(0,212,160,0.22)"  : "rgba(245,158,11,0.25)";
 
   return (
     <motion.div
@@ -58,7 +66,7 @@ export default function TabSwitcher({ active, onChange }: Props) {
 
         {tabs.map((tab, i) => {
           const isActive = active === tab.id;
-          const ref = i === 0 ? compRef : clientRef;
+          const ref = refs[i];
           return (
             <button
               key={tab.id}

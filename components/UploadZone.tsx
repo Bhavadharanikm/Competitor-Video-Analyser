@@ -8,19 +8,18 @@ interface Props {
   onResult: (data: Record<string, unknown>, name: string) => void;
 }
 
-const folderMap: Record<Tab, string> = {
-  competitor: "Competitor Clips",
-  client:     "Client Reels",
-};
+const CLIENT_NAMES = ["FLOHOM", "Paradise Pointe"];
 
 const modeLabelMap: Record<Tab, string> = {
   competitor: "Competitor Analysis",
   client:     "Client Analysis",
+  automation: "Video Automation",
 };
 
 const step3Sub: Record<Tab, string> = {
   competitor: "Running AI analysis",
   client:     "Generating insights",
+  automation: "Building automation",
 };
 
 type Step = "idle" | "load" | "process" | "analyse" | "done" | "error";
@@ -31,18 +30,22 @@ const STEPS = [
 ];
 
 export default function UploadZone({ activeTab, onResult }: Props) {
-  const [url, setUrl]         = useState("");
-  const [isDragging, setDrag] = useState(false);
-  const [step, setStep]       = useState<Step>("idle");
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [errMsg, setErrMsg]   = useState<string | null>(null);
+  const [url, setUrl]           = useState("");
+  const [step, setStep]         = useState<Step>("idle");
+  const [errMsg, setErrMsg]     = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
-  const fileRef   = useRef<HTMLInputElement>(null);
+  const [clientName, setClientName] = useState(CLIENT_NAMES[0]);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const activeColor = activeTab === "competitor" ? "#6366F1" : "#00D4A0";
-  const activeGlow  = activeTab === "competitor" ? "rgba(99,102,241,0.25)" : "rgba(0,212,160,0.22)";
-  const cardBorder  = activeTab === "competitor" ? "rgba(99,102,241,0.3)" : "rgba(0,212,160,0.25)";
+  const activeColor =
+    activeTab === "competitor" ? "#6366F1" :
+    activeTab === "client"     ? "#00D4A0" : "#F59E0B";
+  const activeGlow =
+    activeTab === "competitor" ? "rgba(99,102,241,0.25)" :
+    activeTab === "client"     ? "rgba(0,212,160,0.22)"  : "rgba(245,158,11,0.25)";
+  const cardBorder =
+    activeTab === "competitor" ? "rgba(99,102,241,0.3)" :
+    activeTab === "client"     ? "rgba(0,212,160,0.25)" : "rgba(245,158,11,0.3)";
 
   const clearTimers = () => { timersRef.current.forEach(clearTimeout); timersRef.current = []; };
 
@@ -66,13 +69,12 @@ export default function UploadZone({ activeTab, onResult }: Props) {
       const res = await fetch("/api/analyse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, type: activeTab }),
+        body: JSON.stringify({ ...payload, type: activeTab, ...(activeTab === "client" ? { clientName } : {}) }),
       });
       clearTimers();
       if (!res.ok) throw new Error((await res.text()) || `Error ${res.status}`);
       const data = await res.json();
       setStep("done");
-      setFileName(displayName);
       onResult(data, displayName);
     } catch (err: unknown) {
       clearTimers();
@@ -87,21 +89,15 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     runAnalysis({ url }, `${name}.mp4`);
   };
 
-  const handleFile = (file: File) => {
-    setFileName(file.name);
-    runAnalysis({ fileName: file.name, fileSize: file.size }, file.name);
-  };
-
   const handleReset = () => {
     clearTimers();
     setStep("idle");
-    setFileName(null);
     setErrMsg(null);
     setUrl("");
   };
 
-  const running    = step === "load" || step === "process" || step === "analyse";
-  const stepIndex  = STEPS.findIndex((s) => s.key === step);
+  const running   = step === "load" || step === "process" || step === "analyse";
+  const stepIndex = STEPS.findIndex((s) => s.key === step);
 
   return (
     <motion.div
@@ -123,22 +119,38 @@ export default function UploadZone({ activeTab, onResult }: Props) {
           />
           {modeLabelMap[activeTab]}
         </div>
-        <div className="flex items-center gap-2" style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, color: "var(--muted)" }}>
-          Saving to{" "}
-          <motion.strong key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ color: "var(--text)", fontWeight: 500 }}>
-            {folderMap[activeTab]}
-          </motion.strong>
-          <button
-            className="text-[11px] px-2.5 py-0.5 rounded-md transition-colors cursor-pointer"
-            style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none" }}
-          >
-            Change
-          </button>
-        </div>
+
+        {/* Client name dropdown — only on Client tab */}
+        <AnimatePresence>
+          {activeTab === "client" && (
+            <motion.div
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 8 }}
+              transition={{ duration: 0.25 }}
+            >
+              <select
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                className="rounded-lg px-3 py-1.5 text-[12px] font-semibold cursor-pointer outline-none transition-colors"
+                style={{
+                  background: "var(--surface2)",
+                  border: `1px solid ${activeColor}`,
+                  color: "var(--text)",
+                  boxShadow: `0 0 10px ${activeGlow}`,
+                }}
+              >
+                {CLIENT_NAMES.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Upload zone */}
-      <div className="relative px-7 py-12 overflow-hidden">
+      {/* URL input row */}
+      <div className="relative px-7 py-8 overflow-hidden">
         {/* Scan beam */}
         <div
           className="absolute top-0 h-full pointer-events-none"
@@ -150,113 +162,56 @@ export default function UploadZone({ activeTab, onResult }: Props) {
           }}
         />
 
-        {/* Drop area */}
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={(e) => {
-            e.preventDefault(); setDrag(false);
-            const f = e.dataTransfer.files[0];
-            if (f?.type.startsWith("video/")) handleFile(f);
-          }}
-          onClick={() => step === "idle" && fileRef.current?.click()}
-          className="rounded-2xl text-center cursor-pointer transition-all duration-300"
-          style={{
-            border: `1.5px dashed ${isDragging ? activeColor : "var(--border-bright)"}`,
-            background: isDragging ? "rgba(255,255,255,0.02)" : "transparent",
-            padding: "40px 40px 32px",
-          }}
-        >
-          <input ref={fileRef} type="file" accept="video/*" className="hidden"
-            onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
+        {errMsg && (
+          <p className="text-[12px] mb-4" style={{ color: "#EF4444" }}>{errMsg}</p>
+        )}
 
-          {/* Icon */}
-          <AnimatePresence mode="wait">
-            {step === "done" ? (
-              <motion.div key="done" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }}
-                className="w-14 h-14 rounded-2xl inline-flex items-center justify-center text-2xl mb-4"
-                style={{ background: "var(--surface2)", border: `1px solid ${activeColor}`, boxShadow: `0 0 20px ${activeGlow}` }}
-              >✓</motion.div>
-            ) : step === "error" ? (
-              <motion.div key="err" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }}
-                className="w-14 h-14 rounded-2xl inline-flex items-center justify-center text-2xl mb-4"
-                style={{ background: "var(--surface2)", border: "1px solid rgba(239,68,68,0.4)" }}
-              >✕</motion.div>
-            ) : (
-              <motion.div key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                className="w-14 h-14 rounded-2xl inline-flex items-center justify-center text-2xl mb-4"
-                style={{ background: "var(--surface2)", border: `1px solid var(--border)`, transition: `border-color 0.3s, box-shadow 0.3s` }}
-              >🎬</motion.div>
-            )}
-          </AnimatePresence>
-
-          <p className="text-[15px] font-medium mb-1.5" style={{ color: "var(--text)" }}>
-            {step === "done" && fileName ? fileName
-              : step === "error" ? "Upload failed"
-              : fileName && running ? fileName
-              : "Drop your video here"}
-          </p>
-          <p className="text-[12px] mb-6" style={{ color: "var(--muted)" }}>
-            {step === "error" ? (errMsg ?? "Try again") : "MP4, MOV, or any video format · up to 2GB"}
-          </p>
-
-          {/* Divider */}
-          <div className="flex items-center gap-4 mb-5">
-            <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-            <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, color: "var(--muted)", letterSpacing: "0.1em" }}>
-              or paste a link
-            </span>
-            <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-          </div>
-
-          {/* URL row */}
-          <div className="flex gap-2.5" onClick={(e) => e.stopPropagation()}>
-            <input
-              type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleGo()}
-              placeholder="https://drive.google.com/file/d/…"
-              disabled={running}
-              className="flex-1 rounded-[10px] px-4 py-3 text-[12px] outline-none transition-colors duration-200 disabled:opacity-50"
-              style={{
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
-                color: "var(--text)",
-                fontFamily: "JetBrains Mono, monospace",
-              }}
-              onFocus={(e) => (e.target.style.borderColor = activeColor)}
-              onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
-            />
-            {running ? (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleReset(); }}
-                className="px-5 py-3 rounded-[10px] text-[13px] font-semibold transition-all cursor-pointer"
-                style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none" }}
-              >
-                Cancel
-              </button>
-            ) : step === "done" ? (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleReset(); }}
-                className="px-5 py-3 rounded-[10px] text-[13px] font-semibold transition-all cursor-pointer"
-                style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none" }}
-              >
-                New
-              </button>
-            ) : (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleGo(); }}
-                disabled={!url.trim()}
-                className="px-5 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer transition-all disabled:opacity-40"
-                style={{ background: activeColor, color: "#fff", boxShadow: `0 0 20px ${activeGlow}`, border: "none" }}
-                onMouseEnter={(e) => { (e.target as HTMLElement).style.transform = "translateY(-1px)"; }}
-                onMouseLeave={(e) => { (e.target as HTMLElement).style.transform = ""; }}
-              >
-                Analyse →
-              </button>
-            )}
-          </div>
+        <div className="flex gap-2.5">
+          <input
+            type="text"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleGo()}
+            placeholder="https://drive.google.com/file/d/…"
+            disabled={running}
+            className="flex-1 rounded-[10px] px-4 py-3 text-[12px] outline-none transition-colors duration-200 disabled:opacity-50"
+            style={{
+              background: "var(--bg)",
+              border: "1px solid var(--border)",
+              color: "var(--text)",
+              fontFamily: "JetBrains Mono, monospace",
+            }}
+            onFocus={(e) => (e.target.style.borderColor = activeColor)}
+            onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+          />
+          {running ? (
+            <button
+              onClick={handleReset}
+              className="px-5 py-3 rounded-[10px] text-[13px] font-semibold transition-all cursor-pointer"
+              style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none" }}
+            >
+              Cancel
+            </button>
+          ) : step === "done" ? (
+            <button
+              onClick={handleReset}
+              className="px-5 py-3 rounded-[10px] text-[13px] font-semibold transition-all cursor-pointer"
+              style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none" }}
+            >
+              New
+            </button>
+          ) : (
+            <button
+              onClick={handleGo}
+              disabled={!url.trim()}
+              className="px-5 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer transition-all disabled:opacity-40"
+              style={{ background: activeColor, color: "#fff", boxShadow: `0 0 20px ${activeGlow}`, border: "none" }}
+              onMouseEnter={(e) => { (e.target as HTMLElement).style.transform = "translateY(-1px)"; }}
+              onMouseLeave={(e) => { (e.target as HTMLElement).style.transform = ""; }}
+            >
+              Analyse →
+            </button>
+          )}
         </div>
       </div>
 

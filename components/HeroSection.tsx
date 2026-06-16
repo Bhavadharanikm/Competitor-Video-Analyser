@@ -2,7 +2,7 @@
 import { motion } from "framer-motion";
 
 interface Props {
-  activeTab: "competitor" | "client";
+  activeTab: "competitor" | "client" | "automation";
 }
 
 const words = [

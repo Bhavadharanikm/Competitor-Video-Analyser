@@ -5,14 +5,7 @@ import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
 import TabSwitcher, { type Tab } from "@/components/TabSwitcher";
 import UploadZone from "@/components/UploadZone";
-import RecentFiles, { type VideoFile } from "@/components/RecentFiles";
-
-const SEED: VideoFile[] = [
-  { name: "mirrored-cabin-giveaway.mp4", type: "competitor", size: "24.1 MB", when: "Today · 7:42 PM",      source: "drive"  },
-  { name: "hot-tub-sunset-reel.mp4",     type: "client",     size: "18.7 MB", when: "Today · 6:15 PM",      source: "upload" },
-  { name: "lakehouse-walkthrough.mp4",   type: "client",     size: "31.2 MB", when: "Yesterday · 2:08 PM",  source: "drive"  },
-  { name: "treehouse-tour-ig.mp4",       type: "competitor", size: "12.4 MB", when: "Yesterday · 11:30 AM", source: "upload" },
-];
+import VideoAutomation from "@/components/VideoAutomation";
 
 function now() {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -20,7 +13,6 @@ function now() {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("competitor");
-  const [files, setFiles]         = useState<VideoFile[]>(SEED);
   const [analysis, setAnalysis]   = useState<Record<string, unknown> | null>(null);
   const [analysedName, setAnalysedName] = useState<string | null>(null);
 
@@ -30,10 +22,6 @@ export default function Home() {
   const handleResult = (data: Record<string, unknown>, name: string) => {
     setAnalysis(data);
     setAnalysedName(name);
-    setFiles((prev) => [
-      { name, type: activeTab, size: "—", when: `Today · ${now()}`, source: "drive" },
-      ...prev,
-    ]);
   };
 
   const handleTabChange = (t: Tab) => {
@@ -77,7 +65,10 @@ export default function Home() {
 
         <HeroSection activeTab={activeTab} />
         <TabSwitcher active={activeTab} onChange={handleTabChange} />
-        <UploadZone activeTab={activeTab} onResult={handleResult} />
+        {activeTab === "automation"
+          ? <VideoAutomation />
+          : <UploadZone activeTab={activeTab} onResult={handleResult} />
+        }
 
         {/* Analysis results */}
         <AnimatePresence>
@@ -107,7 +98,6 @@ export default function Home() {
           )}
         </AnimatePresence>
 
-        <RecentFiles files={files} activeTab={activeTab} onRerun={(f) => setActiveTab(f.type)} />
       </div>
 
       <footer
