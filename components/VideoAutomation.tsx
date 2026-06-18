@@ -55,7 +55,7 @@ export default function VideoAutomation() {
   const clearTimers = () => { timersRef.current.forEach(clearTimeout); timersRef.current = []; };
 
   const handleSubmit = async () => {
-    if (!clientName || !hook || !cta) return;
+    if (!clientName) return;
     setStep("running");
     setErrMsg(null);
     timersRef.current.push(setTimeout(() => {}, 1000));
@@ -229,7 +229,7 @@ export default function VideoAutomation() {
           ) : (
             <button
               onClick={running ? handleReset : handleSubmit}
-              disabled={!running && (!clientName || !hook || !cta)}
+              disabled={!running && !clientName}
               className="px-6 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer transition-all disabled:opacity-40"
               style={running
                 ? { border: "1px solid var(--border)", color: "var(--muted)", background: "none" }
