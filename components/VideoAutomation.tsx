@@ -46,7 +46,7 @@ export default function VideoAutomation() {
       .catch(() => { setFetchError("Could not load sheet data."); setLoading(false); });
   }, []);
 
-  const clientKey = headers[0] ?? "";
+  const fileKey = headers.find((h) => h.toLowerCase().includes("file")) ?? headers[0] ?? "";
 
   const handleClientChange = (name: string) => {
     setClientName(name);
@@ -194,13 +194,13 @@ export default function VideoAutomation() {
                 }}
               >
                 {rows.map((row, i) => (
-                  <option key={i} value={row[clientKey]}>{row[clientKey]}</option>
+                  <option key={i} value={row[fileKey]}>{row[fileKey]}</option>
                 ))}
               </select>
               {selectedFile && (
                 <button
                   onClick={() => {
-                    const row = rows.find((r) => r[clientKey] === selectedFile);
+                    const row = rows.find((r) => r[fileKey] === selectedFile);
                     if (row) setSelected(row);
                   }}
                   className="mt-2 text-[11px] font-semibold transition-colors"
@@ -260,7 +260,7 @@ export default function VideoAutomation() {
               <div className="flex items-center justify-between px-7 py-5 sticky top-0" style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
                 <div>
                   <p className="text-[11px] font-semibold tracking-widest uppercase mb-0.5" style={{ color: "var(--muted)" }}>Client Details</p>
-                  <p className="text-[15px] font-bold" style={{ color: "var(--text)" }}>{selected[clientKey]}</p>
+                  <p className="text-[15px] font-bold" style={{ color: "var(--text)" }}>{selected[fileKey]}</p>
                 </div>
                 <button
                   onClick={() => setSelected(null)}

@@ -1,6 +1,8 @@
 import { google } from "googleapis";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 const SPREADSHEET_ID = "12U6x0wYO5TFkoEzEKx1oJfzKLQv1sm5TgDsQGRlfLaI";
 const SHEET_GID = 303378926;
 
