@@ -6,10 +6,13 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    const res = await fetch(WEBHOOK, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+    const params = new URLSearchParams();
+    for (const [key, val] of Object.entries(body)) {
+      params.set(key, typeof val === "object" ? JSON.stringify(val) : String(val ?? ""));
+    }
+
+    const res = await fetch(`${WEBHOOK}?${params.toString()}`, {
+      method: "GET",
     });
 
     const text = await res.text();
