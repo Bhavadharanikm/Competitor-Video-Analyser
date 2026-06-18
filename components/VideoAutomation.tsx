@@ -61,10 +61,15 @@ export default function VideoAutomation() {
     timersRef.current.push(setTimeout(() => {}, 1000));
 
     try {
-      const res = await fetch("/api/analyse", {
+      const res = await fetch("/api/automate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "automation", clientName, openingHook: hook, cta }),
+        body: JSON.stringify({
+          clientName,
+          openingHook: hook,
+          cta,
+          competitorStructure: rows.find((r) => r[fileKey] === selectedFile) ?? null,
+        }),
       });
       clearTimers();
       if (!res.ok) throw new Error((await res.text()) || `Error ${res.status}`);
