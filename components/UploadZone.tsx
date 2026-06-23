@@ -29,31 +29,12 @@ const STEPS = [
   { key: "analyse", label: "Analyse", sub: ""                       },
 ];
 
-interface DriveFile { id: string; name: string; }
-
-function extractFolderId(url: string): string | null {
-  const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : null;
-}
-
-function extractFileId(url: string): string | null {
-  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : null;
-}
-
 export default function UploadZone({ activeTab, onResult }: Props) {
-  const [url, setUrl]               = useState("");
-  const [step, setStep]             = useState<Step>("idle");
-  const [errMsg, setErrMsg]         = useState<string | null>(null);
-  const [scanning, setScanning]     = useState(false);
+  const [url, setUrl]           = useState("");
+  const [step, setStep]         = useState<Step>("idle");
+  const [errMsg, setErrMsg]     = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
   const [clientName, setClientName] = useState(CLIENT_NAMES[0]);
-
-  // Drive folder file picker (client tab only)
-  const [driveFiles, setDriveFiles]         = useState<DriveFile[]>([]);
-  const [selectedFileId, setSelectedFileId] = useState<string>("");
-  const [fetchingFiles, setFetchingFiles]   = useState(false);
-  const [folderMode, setFolderMode]         = useState(false);
-
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const activeColor =
@@ -76,35 +57,6 @@ export default function UploadZone({ activeTab, onResult }: Props) {
   const triggerScanBeam = () => {
     setScanning(true);
     setTimeout(() => setScanning(false), 2100);
-  };
-
-  const handleUrlChange = async (value: string) => {
-    setUrl(value);
-    setFolderMode(false);
-    setDriveFiles([]);
-    setSelectedFileId("");
-
-    if (activeTab !== "client") return;
-
-    const folderId = extractFolderId(value);
-    if (!folderId) return;
-
-    setFetchingFiles(true);
-    setFolderMode(true);
-    try {
-      const res = await fetch(`/api/drive?folderId=${folderId}`);
-      const data = await res.json();
-      if (data.files?.length) {
-        setDriveFiles(data.files);
-        setSelectedFileId(data.files[0].id);
-      } else {
-        setErrMsg(data.error ?? "No files found in this folder.");
-      }
-    } catch {
-      setErrMsg("Could not fetch folder contents.");
-    } finally {
-      setFetchingFiles(false);
-    }
   };
 
   const runAnalysis = async (payload: Record<string, unknown>, displayName: string) => {
@@ -132,16 +84,9 @@ export default function UploadZone({ activeTab, onResult }: Props) {
   };
 
   const handleGo = () => {
-    if (running) return;
-    if (folderMode && selectedFileId) {
-      const file = driveFiles.find((f) => f.id === selectedFileId);
-      const fileUrl = `https://drive.google.com/file/d/${selectedFileId}/view`;
-      runAnalysis({ url: fileUrl }, file?.name ?? `${selectedFileId}.mp4`);
-    } else {
-      if (!url.trim()) return;
-      const fileId = extractFileId(url) ?? url;
-      runAnalysis({ url }, `${fileId}.mp4`);
-    }
+    if (!url.trim() || running) return;
+    const name = url.split("/d/")[1]?.split("/")[0] ?? "clip";
+    runAnalysis({ url }, `${name}.mp4`);
   };
 
   const handleReset = () => {
@@ -149,14 +94,10 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     setStep("idle");
     setErrMsg(null);
     setUrl("");
-    setDriveFiles([]);
-    setSelectedFileId("");
-    setFolderMode(false);
   };
 
   const running   = step === "load" || step === "process" || step === "analyse";
   const stepIndex = STEPS.findIndex((s) => s.key === step);
-  const canGo     = folderMode ? !!selectedFileId : !!url.trim();
 
   return (
     <motion.div
@@ -208,7 +149,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
         </AnimatePresence>
       </div>
 
-      {/* URL input + file picker */}
+      {/* URL input row */}
       <div className="relative px-7 py-8 overflow-hidden">
         {/* Scan beam */}
         <div
@@ -225,14 +166,13 @@ export default function UploadZone({ activeTab, onResult }: Props) {
           <p className="text-[12px] mb-4" style={{ color: "#EF4444" }}>{errMsg}</p>
         )}
 
-        {/* URL input row */}
         <div className="flex gap-2.5">
           <input
             type="text"
             value={url}
-            onChange={(e) => handleUrlChange(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !folderMode && handleGo()}
-            placeholder="https://drive.google.com/drive/folders/… or /file/d/…"
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleGo()}
+            placeholder="https://drive.google.com/file/d/…"
             disabled={running}
             className="flex-1 rounded-[10px] px-4 py-3 text-[12px] outline-none transition-colors duration-200 disabled:opacity-50"
             style={{
@@ -260,10 +200,10 @@ export default function UploadZone({ activeTab, onResult }: Props) {
             >
               New
             </button>
-          ) : !folderMode ? (
+          ) : (
             <button
               onClick={handleGo}
-              disabled={!canGo}
+              disabled={!url.trim()}
               className="px-5 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer transition-all disabled:opacity-40"
               style={{ background: activeColor, color: "#fff", boxShadow: `0 0 20px ${activeGlow}`, border: "none" }}
               onMouseEnter={(e) => { (e.target as HTMLElement).style.transform = "translateY(-1px)"; }}
@@ -271,57 +211,8 @@ export default function UploadZone({ activeTab, onResult }: Props) {
             >
               Analyse →
             </button>
-          ) : null}
-        </div>
-
-        {/* File picker — shown after folder link is pasted */}
-        <AnimatePresence>
-          {folderMode && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 4 }}
-              transition={{ duration: 0.25 }}
-              className="mt-4"
-            >
-              {fetchingFiles ? (
-                <div className="h-11 rounded-[10px] animate-pulse" style={{ background: "var(--surface2)" }} />
-              ) : (
-                <div className="flex gap-2.5">
-                  <select
-                    value={selectedFileId}
-                    onChange={(e) => setSelectedFileId(e.target.value)}
-                    disabled={running}
-                    className="flex-1 rounded-[10px] px-4 py-3 text-[13px] font-medium outline-none cursor-pointer disabled:opacity-50"
-                    style={{
-                      background: "var(--bg)",
-                      border: `1px solid ${activeColor}`,
-                      color: "var(--text)",
-                      boxShadow: `0 0 12px ${activeGlow}`,
-                    }}
-                  >
-                    {driveFiles.map((f) => (
-                      <option key={f.id} value={f.id}>{f.name}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleGo}
-                    disabled={!selectedFileId || running}
-                    className="px-5 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer transition-all disabled:opacity-40"
-                    style={{ background: activeColor, color: "#fff", boxShadow: `0 0 20px ${activeGlow}`, border: "none" }}
-                    onMouseEnter={(e) => { (e.target as HTMLElement).style.transform = "translateY(-1px)"; }}
-                    onMouseLeave={(e) => { (e.target as HTMLElement).style.transform = ""; }}
-                  >
-                    Analyse →
-                  </button>
-                </div>
-              )}
-              <p className="mt-2 text-[11px]" style={{ color: "var(--muted)" }}>
-                {driveFiles.length} file{driveFiles.length !== 1 ? "s" : ""} found in folder
-              </p>
-            </motion.div>
           )}
-        </AnimatePresence>
+        </div>
       </div>
 
       {/* Steps */}

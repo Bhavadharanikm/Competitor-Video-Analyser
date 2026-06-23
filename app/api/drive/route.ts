@@ -1,4 +1,3 @@
-import { google } from "googleapis";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -7,24 +6,19 @@ export async function GET(req: NextRequest) {
   const folderId = req.nextUrl.searchParams.get("folderId");
   if (!folderId) return NextResponse.json({ error: "Missing folderId" }, { status: 400 });
 
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) return NextResponse.json({ error: "Google API key not configured" }, { status: 500 });
+
   try {
-    const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-      },
-      scopes: ["https://www.googleapis.com/auth/drive.readonly"],
-    });
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType)&orderBy=name&key=${apiKey}`,
+      { cache: "no-store" }
+    );
 
-    const drive = google.drive({ version: "v3", auth });
+    const data = await res.json();
+    if (!res.ok) return NextResponse.json({ error: data.error?.message ?? "Drive API error" }, { status: res.status });
 
-    const res = await drive.files.list({
-      q: `'${folderId}' in parents and trashed = false`,
-      fields: "files(id, name, mimeType)",
-      orderBy: "name",
-    });
-
-    const files = (res.data.files ?? []).map((f) => ({ id: f.id, name: f.name }));
+    const files = (data.files ?? []).map((f: { id: string; name: string }) => ({ id: f.id, name: f.name }));
     return NextResponse.json({ files });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
