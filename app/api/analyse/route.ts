@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const WEBHOOK = "https://n8n.srv1597665.hstgr.cloud/webhook/instagram-analyser";
+const WEBHOOKS: Record<string, string> = {
+  competitor: "https://n8n.srv1597665.hstgr.cloud/webhook/instagram-analyser",
+  client:     "https://n8n.srv1597665.hstgr.cloud/webhook/Instagram_Analyser",
+};
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const webhook = WEBHOOKS[body.type as string] ?? WEBHOOKS.competitor;
 
-    const res = await fetch(WEBHOOK, {
+    const res = await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
