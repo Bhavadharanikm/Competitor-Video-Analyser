@@ -8,7 +8,7 @@ interface Props {
   onResult: (data: Record<string, unknown>, name: string) => void;
 }
 
-const CLIENT_NAMES = ["FLOHOM", "Paradise Pointe"];
+const CLIENT_NAMES = ["FLOHOM", "Paradise Pointe", "Awayframes"];
 
 const modeLabelMap: Record<Tab, string> = {
   competitor: "Competitor Analysis",
