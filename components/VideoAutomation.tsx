@@ -6,7 +6,7 @@ const ACTIVE_COLOR = "#F59E0B";
 const ACTIVE_GLOW  = "rgba(245,158,11,0.25)";
 const CARD_BORDER  = "rgba(245,158,11,0.3)";
 
-const CLIENT_NAMES = ["FLOHOM", "Myrinn", "Paradise Pointe"];
+const CLIENT_NAMES = ["FLOHOM", "Myrinn", "Paradise Pointe", "Awayframes"];
 
 interface SheetRow {
   [key: string]: string;
