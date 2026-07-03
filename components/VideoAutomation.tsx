@@ -6,7 +6,6 @@ const ACTIVE_COLOR = "#F59E0B";
 const ACTIVE_GLOW  = "rgba(245,158,11,0.25)";
 const CARD_BORDER  = "rgba(245,158,11,0.3)";
 
-const CLIENT_NAMES = ["FLOHOM", "Myrinn", "Paradise Pointe", "Awayframes"];
 
 interface SheetRow {
   [key: string]: string;
@@ -22,7 +21,8 @@ export default function VideoAutomation() {
 
   const [selected, setSelected]     = useState<SheetRow | null>(null);
   const [selectedFile, setSelectedFile] = useState<string>("");
-  const [clientName, setClientName] = useState(CLIENT_NAMES[0]);
+  const [clientNames, setClientNames] = useState<string[]>([]);
+  const [clientName, setClientName] = useState("");
   const [hook, setHook]           = useState("");
   const [cta, setCta]             = useState("");
 
@@ -53,20 +53,23 @@ export default function VideoAutomation() {
       .catch(() => { setFetchError("Could not load sheet data."); setLoading(false); });
   }, []);
 
-  // Fetch all properties once on mount
+  // Fetch all client slugs + properties once on mount
   useEffect(() => {
     fetch("/api/properties")
       .then((r) => r.json())
       .then((data) => {
         const all: Record<string, string[]> = data.properties ?? {};
         setAllProperties(all);
-        const initial = all[clientName] ?? [];
+        const clients = Object.keys(all).sort();
+        setClientNames(clients);
+        const first = clients[0] ?? "";
+        setClientName(first);
+        const initial = all[first] ?? [];
         setProperties(initial);
         setSelectedProperty(initial[0] ?? "");
         setPropsLoading(false);
       })
       .catch(() => setPropsLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Filter locally when client changes
@@ -162,7 +165,7 @@ export default function VideoAutomation() {
               boxShadow: `0 0 12px ${ACTIVE_GLOW}`,
             }}
           >
-            {CLIENT_NAMES.map((name) => (
+            {clientNames.map((name) => (
               <option key={name} value={name}>{name}</option>
             ))}
           </select>
