@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -10,20 +10,26 @@ function getSupabase() {
   );
 }
 
-// GET /api/properties?client=FLOHOM
-export async function GET(req: NextRequest) {
-  const client = req.nextUrl.searchParams.get("client");
-  if (!client) return NextResponse.json({ error: "Missing client" }, { status: 400 });
-
+// GET /api/properties — returns all properties grouped by client
+// { "FLOHOM": ["FLO15", "FLO16", ...], "Awayframes": [...] }
+export async function GET() {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("Client_Video_Analysis")
-    .select("Property_Tag")
-    .eq("Client_Slug", client)
+    .select("Client_Slug, Property_Tag")
     .not("Property_Tag", "is", null);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const unique = [...new Set((data ?? []).map((r) => r.Property_Tag as string).filter(Boolean))].sort();
-  return NextResponse.json({ properties: unique });
+  const grouped: Record<string, string[]> = {};
+  for (const row of data ?? []) {
+    const client = row.Client_Slug as string;
+    const tag = row.Property_Tag as string;
+    if (!client || !tag) continue;
+    if (!grouped[client]) grouped[client] = [];
+    if (!grouped[client].includes(tag)) grouped[client].push(tag);
+  }
+  for (const key of Object.keys(grouped)) grouped[key].sort();
+
+  return NextResponse.json({ properties: grouped });
 }

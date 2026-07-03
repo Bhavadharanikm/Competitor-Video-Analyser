@@ -39,9 +39,10 @@ export default function UploadZone({ activeTab, onResult }: Props) {
   const [showAddClient, setShowAddClient] = useState(false);
   const [newClientName, setNewClientName] = useState("");
 
+  const [allProperties, setAllProperties]       = useState<Record<string, string[]>>({});
   const [properties, setProperties]             = useState<string[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string>("");
-  const [propsLoading, setPropsLoading]         = useState(false);
+  const [propsLoading, setPropsLoading]         = useState(true);
   const [showAddProp, setShowAddProp]           = useState(false);
   const [newPropName, setNewPropName]           = useState("");
 
@@ -56,21 +57,24 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     }
   }, []);
 
-  // Fetch properties when client changes (only on client tab)
+  // Fetch all properties once on mount
   useEffect(() => {
-    if (activeTab !== "client") return;
-    setPropsLoading(true);
-    setSelectedProperty("");
-    fetch(`/api/properties?client=${encodeURIComponent(clientName)}`)
+    fetch("/api/properties")
       .then((r) => r.json())
       .then((data) => {
-        const props: string[] = data.properties ?? [];
-        setProperties(props);
-        setSelectedProperty(props[0] ?? "");
+        const all: Record<string, string[]> = data.properties ?? {};
+        setAllProperties(all);
         setPropsLoading(false);
       })
-      .catch(() => { setProperties([]); setPropsLoading(false); });
-  }, [clientName, activeTab]);
+      .catch(() => setPropsLoading(false));
+  }, []);
+
+  // Filter locally when client changes
+  useEffect(() => {
+    const props = allProperties[clientName] ?? [];
+    setProperties(props);
+    setSelectedProperty(props[0] ?? "");
+  }, [clientName, allProperties]);
 
   const handleAddClient = () => {
     const name = newClientName.trim();

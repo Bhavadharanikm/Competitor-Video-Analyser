@@ -26,9 +26,10 @@ export default function VideoAutomation() {
   const [hook, setHook]           = useState("");
   const [cta, setCta]             = useState("");
 
+  const [allProperties, setAllProperties]   = useState<Record<string, string[]>>({});
   const [properties, setProperties]         = useState<string[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string>("");
-  const [propsLoading, setPropsLoading]     = useState(false);
+  const [propsLoading, setPropsLoading]     = useState(true);
   const [showAddProp, setShowAddProp]       = useState(false);
   const [newPropName, setNewPropName]       = useState("");
 
@@ -52,20 +53,28 @@ export default function VideoAutomation() {
       .catch(() => { setFetchError("Could not load sheet data."); setLoading(false); });
   }, []);
 
-  // Fetch properties whenever client changes
+  // Fetch all properties once on mount
   useEffect(() => {
-    setPropsLoading(true);
-    setSelectedProperty("");
-    fetch(`/api/properties?client=${encodeURIComponent(clientName)}`)
+    fetch("/api/properties")
       .then((r) => r.json())
       .then((data) => {
-        const props: string[] = data.properties ?? [];
-        setProperties(props);
-        setSelectedProperty(props[0] ?? "");
+        const all: Record<string, string[]> = data.properties ?? {};
+        setAllProperties(all);
+        const initial = all[clientName] ?? [];
+        setProperties(initial);
+        setSelectedProperty(initial[0] ?? "");
         setPropsLoading(false);
       })
-      .catch(() => { setProperties([]); setPropsLoading(false); });
-  }, [clientName]);
+      .catch(() => setPropsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Filter locally when client changes
+  useEffect(() => {
+    const props = allProperties[clientName] ?? [];
+    setProperties(props);
+    setSelectedProperty(props[0] ?? "");
+  }, [clientName, allProperties]);
 
   const handleAddProperty = () => {
     const name = newPropName.trim();
