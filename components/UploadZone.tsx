@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Tab } from "./TabSwitcher";
 
@@ -8,7 +8,7 @@ interface Props {
   onResult: (data: Record<string, unknown>, name: string) => void;
 }
 
-const CLIENT_NAMES = ["FLOHOM", "Paradise Pointe", "Awayframes"];
+const BASE_CLIENT_NAMES = ["FLOHOM", "Paradise Pointe", "Awayframes"];
 
 const modeLabelMap: Record<Tab, string> = {
   competitor: "Competitor Analysis",
@@ -34,8 +34,31 @@ export default function UploadZone({ activeTab, onResult }: Props) {
   const [step, setStep]         = useState<Step>("idle");
   const [errMsg, setErrMsg]     = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
-  const [clientName, setClientName] = useState(CLIENT_NAMES[0]);
+  const [clients, setClients]   = useState<string[]>(BASE_CLIENT_NAMES);
+  const [clientName, setClientName] = useState(BASE_CLIENT_NAMES[0]);
+  const [showAddClient, setShowAddClient] = useState(false);
+  const [newClientName, setNewClientName] = useState("");
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("clientNames");
+    if (saved) {
+      const parsed: string[] = JSON.parse(saved);
+      setClients(parsed);
+      setClientName(parsed[0]);
+    }
+  }, []);
+
+  const handleAddClient = () => {
+    const name = newClientName.trim();
+    if (!name || clients.includes(name)) return;
+    const updated = [...clients, name];
+    setClients(updated);
+    setClientName(name);
+    localStorage.setItem("clientNames", JSON.stringify(updated));
+    setNewClientName("");
+    setShowAddClient(false);
+  };
 
   const activeColor =
     activeTab === "competitor" ? "#6366F1" :
@@ -128,6 +151,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 8 }}
               transition={{ duration: 0.25 }}
+              className="flex items-center gap-2 relative"
             >
               <select
                 value={clientName}
@@ -140,10 +164,79 @@ export default function UploadZone({ activeTab, onResult }: Props) {
                   boxShadow: `0 0 10px ${activeGlow}`,
                 }}
               >
-                {CLIENT_NAMES.map((n) => (
+                {clients.map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
               </select>
+
+              {/* Add client button */}
+              <button
+                onClick={() => setShowAddClient((v) => !v)}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-[16px] font-bold transition-all cursor-pointer"
+                style={{
+                  background: "var(--surface2)",
+                  border: `1px solid ${activeColor}`,
+                  color: activeColor,
+                  boxShadow: `0 0 8px ${activeGlow}`,
+                }}
+                title="Add new client"
+              >
+                +
+              </button>
+
+              {/* Add client popup */}
+              <AnimatePresence>
+                {showAddClient && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.92, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.92, y: -6 }}
+                    transition={{ duration: 0.18 }}
+                    className="absolute right-0 top-10 z-50 rounded-2xl p-4 flex flex-col gap-3 shadow-xl"
+                    style={{
+                      background: "var(--surface)",
+                      border: `1px solid ${activeColor}`,
+                      boxShadow: `0 0 24px ${activeGlow}`,
+                      minWidth: 220,
+                    }}
+                  >
+                    <p className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: "var(--muted)" }}>New Client</p>
+                    <input
+                      autoFocus
+                      type="text"
+                      value={newClientName}
+                      onChange={(e) => setNewClientName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddClient()}
+                      placeholder="Client name…"
+                      className="rounded-[8px] px-3 py-2 text-[12px] outline-none"
+                      style={{
+                        background: "var(--bg)",
+                        border: "1px solid var(--border)",
+                        color: "var(--text)",
+                      }}
+                      onFocus={(e) => (e.target.style.borderColor = activeColor)}
+                      onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleAddClient}
+                        disabled={!newClientName.trim()}
+                        className="flex-1 py-2 rounded-[8px] text-[12px] font-semibold cursor-pointer disabled:opacity-40"
+                        style={{ background: activeColor, color: "#fff", border: "none" }}
+                      >
+                        Add
+                      </button>
+                      <button
+                        onClick={() => { setShowAddClient(false); setNewClientName(""); }}
+                        className="flex-1 py-2 rounded-[8px] text-[12px] font-semibold cursor-pointer"
+                        style={{ background: "none", border: "1px solid var(--border)", color: "var(--muted)" }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
         </AnimatePresence>
