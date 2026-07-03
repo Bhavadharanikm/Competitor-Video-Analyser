@@ -44,7 +44,6 @@ export default function UploadZone({ activeTab, onResult }: Props) {
   const [propsLoading, setPropsLoading]         = useState(false);
   const [showAddProp, setShowAddProp]           = useState(false);
   const [newPropName, setNewPropName]           = useState("");
-  const [addingProp, setAddingProp]             = useState(false);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -84,24 +83,14 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     setShowAddClient(false);
   };
 
-  const handleAddProperty = async () => {
+  const handleAddProperty = () => {
     const name = newPropName.trim();
     if (!name || properties.includes(name)) return;
-    setAddingProp(true);
-    try {
-      await fetch("/api/properties", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client: clientName, property: name }),
-      });
-      const updated = [...properties, name].sort();
-      setProperties(updated);
-      setSelectedProperty(name);
-      setNewPropName("");
-      setShowAddProp(false);
-    } finally {
-      setAddingProp(false);
-    }
+    const updated = [...properties, name].sort();
+    setProperties(updated);
+    setSelectedProperty(name);
+    setNewPropName("");
+    setShowAddProp(false);
   };
 
   const activeColor =
@@ -368,11 +357,11 @@ export default function UploadZone({ activeTab, onResult }: Props) {
                     <div className="flex gap-2">
                       <button
                         onClick={handleAddProperty}
-                        disabled={!newPropName.trim() || addingProp}
+                        disabled={!newPropName.trim()}
                         className="flex-1 py-2 rounded-[8px] text-[12px] font-semibold cursor-pointer disabled:opacity-40"
                         style={{ background: activeColor, color: "#fff", border: "none" }}
                       >
-                        {addingProp ? "Adding…" : "Add"}
+                        Add
                       </button>
                       <button
                         onClick={() => { setShowAddProp(false); setNewPropName(""); }}
