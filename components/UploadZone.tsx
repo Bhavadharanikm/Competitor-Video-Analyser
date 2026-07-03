@@ -38,6 +38,14 @@ export default function UploadZone({ activeTab, onResult }: Props) {
   const [clientName, setClientName] = useState(BASE_CLIENT_NAMES[0]);
   const [showAddClient, setShowAddClient] = useState(false);
   const [newClientName, setNewClientName] = useState("");
+
+  const [properties, setProperties]             = useState<string[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<string>("");
+  const [propsLoading, setPropsLoading]         = useState(false);
+  const [showAddProp, setShowAddProp]           = useState(false);
+  const [newPropName, setNewPropName]           = useState("");
+  const [addingProp, setAddingProp]             = useState(false);
+
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -49,6 +57,22 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     }
   }, []);
 
+  // Fetch properties when client changes (only on client tab)
+  useEffect(() => {
+    if (activeTab !== "client") return;
+    setPropsLoading(true);
+    setSelectedProperty("");
+    fetch(`/api/properties?client=${encodeURIComponent(clientName)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const props: string[] = data.properties ?? [];
+        setProperties(props);
+        setSelectedProperty(props[0] ?? "");
+        setPropsLoading(false);
+      })
+      .catch(() => { setProperties([]); setPropsLoading(false); });
+  }, [clientName, activeTab]);
+
   const handleAddClient = () => {
     const name = newClientName.trim();
     if (!name || clients.includes(name)) return;
@@ -58,6 +82,26 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     localStorage.setItem("clientNames", JSON.stringify(updated));
     setNewClientName("");
     setShowAddClient(false);
+  };
+
+  const handleAddProperty = async () => {
+    const name = newPropName.trim();
+    if (!name || properties.includes(name)) return;
+    setAddingProp(true);
+    try {
+      await fetch("/api/properties", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client: clientName, property: name }),
+      });
+      const updated = [...properties, name].sort();
+      setProperties(updated);
+      setSelectedProperty(name);
+      setNewPropName("");
+      setShowAddProp(false);
+    } finally {
+      setAddingProp(false);
+    }
   };
 
   const activeColor =
@@ -92,7 +136,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
       const res = await fetch("/api/analyse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, type: activeTab, ...(activeTab === "client" ? { clientName } : {}) }),
+        body: JSON.stringify({ ...payload, type: activeTab, ...(activeTab === "client" ? { clientName, property: selectedProperty } : {}) }),
       });
       clearTimers();
       if (!res.ok) throw new Error((await res.text()) || `Error ${res.status}`);
@@ -241,6 +285,110 @@ export default function UploadZone({ activeTab, onResult }: Props) {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Property dropdown — only on Client tab */}
+      <AnimatePresence>
+        {activeTab === "client" && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            className="px-7 py-4 relative"
+            style={{ borderBottom: "1px solid var(--border)" }}
+          >
+            <p className="text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--muted)" }}>Property</p>
+            <div className="flex items-center gap-2 relative">
+              {propsLoading ? (
+                <div className="flex-1 h-10 rounded-[10px] animate-pulse" style={{ background: "var(--surface2)" }} />
+              ) : (
+                <select
+                  value={selectedProperty}
+                  onChange={(e) => setSelectedProperty(e.target.value)}
+                  disabled={running || properties.length === 0}
+                  className="flex-1 rounded-[10px] px-4 py-2.5 text-[12px] font-medium outline-none cursor-pointer disabled:opacity-50"
+                  style={{
+                    background: "var(--bg)",
+                    border: `1px solid ${activeColor}`,
+                    color: "var(--text)",
+                    boxShadow: `0 0 10px ${activeGlow}`,
+                  }}
+                >
+                  {properties.length === 0
+                    ? <option value="">No properties yet</option>
+                    : properties.map((p) => <option key={p} value={p}>{p}</option>)
+                  }
+                </select>
+              )}
+
+              <button
+                onClick={() => setShowAddProp((v) => !v)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[16px] font-bold cursor-pointer flex-shrink-0"
+                style={{
+                  background: "var(--surface2)",
+                  border: `1px solid ${activeColor}`,
+                  color: activeColor,
+                  boxShadow: `0 0 8px ${activeGlow}`,
+                }}
+                title="Add property tag"
+              >
+                +
+              </button>
+
+              <AnimatePresence>
+                {showAddProp && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.92, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.92, y: -6 }}
+                    transition={{ duration: 0.18 }}
+                    className="absolute right-0 top-10 z-50 rounded-2xl p-4 flex flex-col gap-3 shadow-xl"
+                    style={{
+                      background: "var(--surface)",
+                      border: `1px solid ${activeColor}`,
+                      boxShadow: `0 0 24px ${activeGlow}`,
+                      minWidth: 240,
+                    }}
+                  >
+                    <p className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: "var(--muted)" }}>
+                      New Property — {clientName}
+                    </p>
+                    <input
+                      autoFocus
+                      type="text"
+                      value={newPropName}
+                      onChange={(e) => setNewPropName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddProperty()}
+                      placeholder="e.g. FLO17, Mountain Cabin…"
+                      className="rounded-[8px] px-3 py-2 text-[12px] outline-none"
+                      style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" }}
+                      onFocus={(e) => (e.target.style.borderColor = activeColor)}
+                      onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleAddProperty}
+                        disabled={!newPropName.trim() || addingProp}
+                        className="flex-1 py-2 rounded-[8px] text-[12px] font-semibold cursor-pointer disabled:opacity-40"
+                        style={{ background: activeColor, color: "#fff", border: "none" }}
+                      >
+                        {addingProp ? "Adding…" : "Add"}
+                      </button>
+                      <button
+                        onClick={() => { setShowAddProp(false); setNewPropName(""); }}
+                        className="flex-1 py-2 rounded-[8px] text-[12px] font-semibold cursor-pointer"
+                        style={{ background: "none", border: "1px solid var(--border)", color: "var(--muted)" }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* URL input row */}
       <div className="relative px-7 py-8 overflow-hidden">
