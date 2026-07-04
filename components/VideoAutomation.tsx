@@ -492,15 +492,24 @@ export default function VideoAutomation() {
         {errMsg && <p className="text-[12px]" style={{ color: "#EF4444" }}>{errMsg}</p>}
 
         {/* Submit */}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
           {step === "done" ? (
-            <button
-              onClick={handleReset}
-              className="px-6 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer"
-              style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none" }}
-            >
-              New
-            </button>
+            <>
+              <button
+                onClick={handleReset}
+                className="px-6 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer"
+                style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none" }}
+              >
+                New
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="px-6 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer transition-all"
+                style={{ background: ACTIVE_COLOR, color: "#fff", boxShadow: `0 0 20px ${ACTIVE_GLOW}`, border: "none" }}
+              >
+                Rerun →
+              </button>
+            </>
           ) : (
             <button
               onClick={running ? handleReset : handleSubmit}
