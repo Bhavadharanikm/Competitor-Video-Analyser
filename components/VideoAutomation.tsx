@@ -44,6 +44,12 @@ export default function VideoAutomation() {
   const [mtHook, setMtHook]                   = useState("");
   const [mtCta, setMtCta]                     = useState("");
 
+  // One Template: searchable client picker
+  const [clientSearch, setClientSearch]           = useState("");
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
+  const [expandedClient, setExpandedClient]       = useState<string | null>(null);
+
   // Detail modal
   const [detailRow, setDetailRow] = useState<SheetRow | null>(null);
 
@@ -98,6 +104,17 @@ export default function VideoAutomation() {
     setMtProperties(props);
     setMtProperty(props[0] ?? "");
   }, [mtClient, allProperties]);
+
+  // Close client dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target as Node)) {
+        setClientDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   // ── Client checkbox helpers ────────────────────────────────────────
   const toggleClient = (name: string) => {
@@ -266,103 +283,179 @@ export default function VideoAutomation() {
                 )}
               </div>
 
-              {/* Client checkboxes */}
+              {/* Client searchable multi-select */}
               <div>
                 <label className="block text-[11px] font-semibold tracking-widest uppercase mb-3" style={{ color: "var(--muted)" }}>
                   Select Clients
                 </label>
                 {propsLoading ? (
-                  <div className="h-20 rounded-[10px] animate-pulse" style={{ background: "var(--surface2)" }} />
+                  <div className="h-11 rounded-[10px] animate-pulse" style={{ background: "var(--surface2)" }} />
                 ) : (
                   <div className="flex flex-col gap-3">
-                    {clientNames.map(name => {
-                      const checked = !!selectedClients[name];
-                      const entry   = selectedClients[name];
-                      return (
-                        <div
-                          key={name}
-                          className="rounded-2xl overflow-hidden transition-all"
-                          style={{ border: `1px solid ${checked ? ACTIVE_COLOR : "var(--border)"}`, boxShadow: checked ? `0 0 12px ${ACTIVE_GLOW}` : "none" }}
-                        >
-                          {/* Checkbox row */}
-                          <div
-                            className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none"
-                            style={{ background: checked ? "rgba(245,158,11,0.05)" : "var(--bg)" }}
-                            onClick={() => toggleClient(name)}
-                          >
-                            <div
-                              className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
-                              style={{ background: checked ? ACTIVE_COLOR : "transparent", border: `1.5px solid ${checked ? ACTIVE_COLOR : "var(--border)"}` }}
-                            >
-                              {checked && <span className="text-[9px] text-white font-bold leading-none">✓</span>}
-                            </div>
-                            <span className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{name}</span>
-                          </div>
+                    {/* Search input + dropdown */}
+                    <div ref={clientDropdownRef} className="relative">
+                      <div
+                        className="flex items-center gap-2 rounded-[10px] px-4 py-3 cursor-text"
+                        style={{ background: "var(--bg)", border: `1px solid ${clientDropdownOpen ? ACTIVE_COLOR : "var(--border)"}`, boxShadow: clientDropdownOpen ? `0 0 12px ${ACTIVE_GLOW}` : "none" }}
+                        onClick={() => setClientDropdownOpen(true)}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ color: "var(--muted)", flexShrink: 0 }}>
+                          <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5"/>
+                          <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                        <input
+                          type="text"
+                          value={clientSearch}
+                          onChange={e => { setClientSearch(e.target.value); setClientDropdownOpen(true); }}
+                          onFocus={() => setClientDropdownOpen(true)}
+                          placeholder="Search clients…"
+                          className="flex-1 text-[13px] outline-none bg-transparent"
+                          style={{ color: "var(--text)" }}
+                        />
+                        {Object.keys(selectedClients).length > 0 && (
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: `rgba(245,158,11,0.15)`, color: ACTIVE_COLOR }}>
+                            {Object.keys(selectedClients).length} selected
+                          </span>
+                        )}
+                      </div>
 
-                          {/* Expanded fields per client */}
-                          <AnimatePresence>
-                            {checked && entry && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="overflow-hidden"
-                              >
-                                <div className="flex flex-col gap-3 px-4 py-4" style={{ borderTop: "1px solid var(--border)" }}>
-                                  {/* Property */}
-                                  <div>
-                                    <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>Property</p>
-                                    <select
-                                      value={entry.property}
-                                      onChange={e => updateEntry(name, "property", e.target.value)}
-                                      className="w-full rounded-[8px] px-3 py-2 text-[12px] outline-none cursor-pointer"
-                                      style={inputStyle}
-                                      onFocus={focusBorder}
-                                      onBlur={blurBorder}
+                      {/* Dropdown list */}
+                      <AnimatePresence>
+                        {clientDropdownOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute left-0 right-0 top-full mt-1 rounded-[10px] overflow-hidden z-20"
+                            style={{ background: "var(--surface)", border: `1px solid ${ACTIVE_COLOR}`, boxShadow: `0 8px 32px rgba(0,0,0,0.18)` }}
+                          >
+                            {clientNames
+                              .filter(n => n.toLowerCase().includes(clientSearch.toLowerCase()))
+                              .map(name => {
+                                const checked = !!selectedClients[name];
+                                return (
+                                  <div
+                                    key={name}
+                                    className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none transition-colors"
+                                    style={{ background: checked ? "rgba(245,158,11,0.07)" : "transparent" }}
+                                    onMouseDown={e => { e.preventDefault(); toggleClient(name); }}
+                                  >
+                                    <div
+                                      className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
+                                      style={{ background: checked ? ACTIVE_COLOR : "transparent", border: `1.5px solid ${checked ? ACTIVE_COLOR : "var(--border)"}` }}
                                     >
-                                      {(allProperties[name] ?? []).map(p => <option key={p} value={p}>{p}</option>)}
-                                    </select>
+                                      {checked && <span className="text-[9px] text-white font-bold leading-none">✓</span>}
+                                    </div>
+                                    <span className="text-[13px]" style={{ color: "var(--text)" }}>{name}</span>
                                   </div>
-                                  {/* Hook */}
-                                  <div>
-                                    <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>
-                                      Opening Hook <span style={{ color: "var(--border)", fontWeight: 400 }}>(optional)</span>
-                                    </p>
-                                    <textarea
-                                      value={entry.openingHook}
-                                      onChange={e => updateEntry(name, "openingHook", e.target.value)}
-                                      placeholder="What grabs attention in the first 3 seconds…"
-                                      rows={2}
-                                      className="w-full rounded-[8px] px-3 py-2 text-[12px] outline-none resize-none"
-                                      style={inputStyle}
-                                      onFocus={focusBorder}
-                                      onBlur={blurBorder}
-                                    />
-                                  </div>
-                                  {/* CTA */}
-                                  <div>
-                                    <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>
-                                      CTA <span style={{ color: "var(--border)", fontWeight: 400 }}>(optional)</span>
-                                    </p>
-                                    <input
-                                      type="text"
-                                      value={entry.cta}
-                                      onChange={e => updateEntry(name, "cta", e.target.value)}
-                                      placeholder="What should viewers do next…"
-                                      className="w-full rounded-[8px] px-3 py-2 text-[12px] outline-none"
-                                      style={inputStyle}
-                                      onFocus={focusBorder}
-                                      onBlur={blurBorder}
-                                    />
-                                  </div>
-                                </div>
-                              </motion.div>
+                                );
+                              })}
+                            {clientNames.filter(n => n.toLowerCase().includes(clientSearch.toLowerCase())).length === 0 && (
+                              <div className="px-4 py-3 text-[12px]" style={{ color: "var(--muted)" }}>No clients match</div>
                             )}
-                          </AnimatePresence>
-                        </div>
-                      );
-                    })}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Selected clients — expandable cards */}
+                    <AnimatePresence>
+                      {Object.entries(selectedClients).map(([name, entry]) => {
+                        const isExpanded = expandedClient === name;
+                        return (
+                          <motion.div
+                            key={name}
+                            initial={{ opacity: 0, y: -6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                            transition={{ duration: 0.18 }}
+                            className="rounded-2xl overflow-hidden"
+                            style={{ border: `1px solid ${isExpanded ? ACTIVE_COLOR : "rgba(245,158,11,0.4)"}`, boxShadow: isExpanded ? `0 0 12px ${ACTIVE_GLOW}` : "none" }}
+                          >
+                            {/* Header row */}
+                            <div
+                              className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none"
+                              style={{ background: isExpanded ? "rgba(245,158,11,0.07)" : "var(--bg)" }}
+                              onClick={() => setExpandedClient(isExpanded ? null : name)}
+                            >
+                              <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0" style={{ background: ACTIVE_COLOR }}>
+                                <span className="text-[9px] text-white font-bold leading-none">✓</span>
+                              </div>
+                              <span className="text-[13px] font-semibold flex-1" style={{ color: "var(--text)" }}>{name}</span>
+                              {entry.property && (
+                                <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "var(--surface2)", color: "var(--muted)" }}>{entry.property}</span>
+                              )}
+                              <span className="text-[11px]" style={{ color: "var(--muted)" }}>{isExpanded ? "▲" : "▼"}</span>
+                              <button
+                                onClick={e => { e.stopPropagation(); toggleClient(name); }}
+                                className="ml-1 w-5 h-5 rounded-full flex items-center justify-center text-[12px] transition-colors"
+                                style={{ background: "var(--surface2)", color: "var(--muted)" }}
+                              >✕</button>
+                            </div>
+
+                            {/* Expanded fields */}
+                            <AnimatePresence>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="flex flex-col gap-3 px-4 py-4" style={{ borderTop: "1px solid var(--border)" }}>
+                                    <div>
+                                      <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>Property</p>
+                                      <select
+                                        value={entry.property}
+                                        onChange={e => updateEntry(name, "property", e.target.value)}
+                                        className="w-full rounded-[8px] px-3 py-2 text-[12px] outline-none cursor-pointer"
+                                        style={inputStyle}
+                                        onFocus={focusBorder}
+                                        onBlur={blurBorder}
+                                      >
+                                        {(allProperties[name] ?? []).map(p => <option key={p} value={p}>{p}</option>)}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>
+                                        Opening Hook <span style={{ color: "var(--border)", fontWeight: 400 }}>(optional)</span>
+                                      </p>
+                                      <textarea
+                                        value={entry.openingHook}
+                                        onChange={e => updateEntry(name, "openingHook", e.target.value)}
+                                        placeholder="What grabs attention in the first 3 seconds…"
+                                        rows={2}
+                                        className="w-full rounded-[8px] px-3 py-2 text-[12px] outline-none resize-none"
+                                        style={inputStyle}
+                                        onFocus={focusBorder}
+                                        onBlur={blurBorder}
+                                      />
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>
+                                        CTA <span style={{ color: "var(--border)", fontWeight: 400 }}>(optional)</span>
+                                      </p>
+                                      <input
+                                        type="text"
+                                        value={entry.cta}
+                                        onChange={e => updateEntry(name, "cta", e.target.value)}
+                                        placeholder="What should viewers do next…"
+                                        className="w-full rounded-[8px] px-3 py-2 text-[12px] outline-none"
+                                        style={inputStyle}
+                                        onFocus={focusBorder}
+                                        onBlur={blurBorder}
+                                      />
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
                   </div>
                 )}
               </div>

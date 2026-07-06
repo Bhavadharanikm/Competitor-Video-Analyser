@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const WEBHOOK = "https://n8n.srv1597665.hstgr.cloud/webhook/Videoediting";
+const WEBHOOK_ONE_TEMPLATE       = "https://n8n.srv1597665.hstgr.cloud/webhook/Multiple-client";
+const WEBHOOK_MULTIPLE_TEMPLATES = "https://n8n.srv1597665.hstgr.cloud/webhook/Videoediting";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,7 +26,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const res = await fetch(`${WEBHOOK}?${params.toString()}`, { method: "GET" });
+    const webhook = body.mode === "one_template" ? WEBHOOK_ONE_TEMPLATE : WEBHOOK_MULTIPLE_TEMPLATES;
+    const res = await fetch(`${webhook}?${params.toString()}`, { method: "GET" });
 
     const text = await res.text();
     let data: unknown;
