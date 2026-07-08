@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
@@ -12,21 +11,28 @@ export async function GET(req: NextRequest) {
     const key = process.env.SUPABASE_SERVICE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!url || !key) {
-      return NextResponse.json({
-        error: "Supabase env vars missing",
-        debug: { hasUrl: !!url, hasKey: !!key },
-      }, { status: 500 });
+      return NextResponse.json({ error: "Supabase env vars missing" }, { status: 500 });
     }
 
-    const supabase = createClient(url, key);
-    const { data, error } = await supabase
-      .from("Reel_Jobs")
-      .select("id, client_slug, property_tag, file_name, status, message, video_url, updated_at")
-      .eq("run_id", runId)
-      .order("updated_at", { ascending: true });
+    const res = await fetch(
+      `${url}/rest/v1/Reel_Jobs?run_id=eq.${encodeURIComponent(runId)}&select=id,client_slug,property_tag,file_name,status,message,video_url,updated_at&order=updated_at.asc`,
+      {
+        headers: {
+          "apikey": key,
+          "Authorization": `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      }
+    );
 
-    if (error) return NextResponse.json({ error: error.message, debug: { url, keyPrefix: key.slice(0, 20) } }, { status: 500 });
-    return NextResponse.json({ jobs: data ?? [], debug: { count: data?.length ?? 0, keyPrefix: key.slice(0, 10), url } });
+    if (!res.ok) {
+      const text = await res.text();
+      return NextResponse.json({ error: `Supabase error ${res.status}: ${text}` }, { status: 500 });
+    }
+
+    const jobs = await res.json();
+    return NextResponse.json({ jobs });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
