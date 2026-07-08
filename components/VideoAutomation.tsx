@@ -735,7 +735,7 @@ export default function VideoAutomation() {
                     // Use file_name from Supabase as label when available (e.g. "Awayframes_Wholesome_8Jul2026")
                     const label = job?.file_name ?? templateName;
                     const currentStepIdx = isDone ? PIPELINE_STEPS.length : messageToStepIdx(job?.message);
-                    const isActive = !!job && !isDone && !isFailed;
+                    const isActive = !isDone && !isFailed;
                     const isQueued = !job;
                     return (
                       <motion.div key={templateName} layout className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${isDone ? "rgba(34,197,94,0.4)" : isFailed ? "rgba(239,68,68,0.4)" : CARD_BORDER}`, background: "var(--surface)" }}>
@@ -773,7 +773,9 @@ export default function VideoAutomation() {
                                       </>
                                     )}
                                   </div>
-                                  <span className="text-[12px]" style={{ color: isStepDone ? "var(--muted)" : isStepCurrent ? "var(--text)" : "var(--border)", fontWeight: isStepCurrent ? 600 : 400 }}>{label}</span>
+                                  <span className="text-[12px]" style={{ color: isStepDone ? "var(--muted)" : isStepCurrent ? "var(--text)" : "var(--border)", fontWeight: isStepCurrent ? 600 : 400 }}>
+                                    {isStepCurrent ? currentMsg : label}
+                                  </span>
                                 </div>
                               );
                             })}
