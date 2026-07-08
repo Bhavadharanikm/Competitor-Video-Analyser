@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type Transition } from "framer-motion";
 
 const ACTIVE_COLOR = "#2563EB";
 const ACTIVE_GLOW  = "rgba(37,99,235,0.25)";
@@ -245,7 +245,7 @@ export default function VideoAutomation() {
   // ── Page variants ─────────────────────────────────────────────────
   const pageIn  = { opacity: 0, y: 18 };
   const pageOut = { opacity: 0, y: -10 };
-  const pageDur = { duration: 0.22, ease: [0.4, 0, 0.2, 1] as number[] };
+  const pageDur: Transition = { duration: 0.22, ease: [0.4, 0, 0.2, 1] };
 
   return (
     <div className="mb-8">
@@ -644,16 +644,9 @@ export default function VideoAutomation() {
                 {errMsg && <p className="text-[11px]" style={{ color: "#EF4444" }}>{errMsg}</p>}
 
                 <div className="flex gap-2">
-                  {step === "done" ? (
-                    <>
-                      <button onClick={handleReset} className="flex-1 py-3 rounded-[10px] text-[12px] font-semibold cursor-pointer" style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none" }}>New</button>
-                      <button onClick={handleSubmit} className="flex-1 py-3 rounded-[10px] text-[12px] font-bold cursor-pointer" style={{ background: ACTIVE_COLOR, color: "#fff", boxShadow: `0 0 16px ${ACTIVE_GLOW}`, border: "none" }}>Rerun →</button>
-                    </>
-                  ) : (
-                    <button onClick={running ? handleReset : handleSubmit} disabled={!running && videosToGenerate === 0} className="w-full py-3 rounded-[10px] text-[12px] font-bold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed" style={running ? { border: "1px solid var(--border)", color: "var(--muted)", background: "none" } : { background: ACTIVE_COLOR, color: "#fff", boxShadow: `0 0 16px ${ACTIVE_GLOW}`, border: "none" }}>
-                      {running ? "Cancel" : "Run automation →"}
-                    </button>
-                  )}
+                  <button onClick={handleSubmit} disabled={videosToGenerate === 0} className="w-full py-3 rounded-[10px] text-[12px] font-bold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed" style={{ background: ACTIVE_COLOR, color: "#fff", boxShadow: `0 0 16px ${ACTIVE_GLOW}`, border: "none" }}>
+                    Run automation →
+                  </button>
                 </div>
               </div>
 
