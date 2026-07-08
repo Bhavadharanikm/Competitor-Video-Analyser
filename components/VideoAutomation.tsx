@@ -88,6 +88,8 @@ export default function VideoAutomation() {
   const [errMsg, setErrMsg]   = useState<string | null>(null);
   const [runId, setRunId]     = useState<string | null>(null);
   const [jobStatuses, setJobStatuses] = useState<ReelJob[]>([]);
+  const [pollCount, setPollCount]     = useState(0);
+  const [pollError, setPollError]     = useState<string | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const pollRef   = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -176,21 +178,30 @@ export default function VideoAutomation() {
 
   const startPolling = (rid: string) => {
     stopPolling();
+    setPollCount(0);
+    setPollError(null);
     const tick = async () => {
       try {
         const res = await fetch(`/api/jobs?runId=${rid}`);
-        if (!res.ok) return;
         const data = await res.json();
+        if (!res.ok) {
+          setPollError(data.error ?? `API error ${res.status}`);
+          return;
+        }
+        setPollError(null);
         const jobs: ReelJob[] = data.jobs ?? [];
+        setPollCount(c => c + 1);
         setJobStatuses(jobs);
         if (jobs.length > 0 && jobs.every(j => j.status === "completed" || j.status === "failed")) {
           stopPolling();
           setStep("done");
         }
-      } catch (_e) { /* ignore transient errors */ }
+      } catch (e) {
+        setPollError(e instanceof Error ? e.message : "Network error");
+      }
     };
-    tick(); // immediate first check
-    pollRef.current = setInterval(tick, 3000);
+    tick();
+    pollRef.current = setInterval(tick, 5000);
   };
 
   const handleSubmit = async () => {
@@ -246,6 +257,8 @@ export default function VideoAutomation() {
     setErrMsg(null);
     setRunId(null);
     setJobStatuses([]);
+    setPollCount(0);
+    setPollError(null);
     setMtHook("");
     setMtCta("");
   };
@@ -365,6 +378,14 @@ export default function VideoAutomation() {
                     {runId && (
                       <p className="text-[10px] mt-1.5 font-mono" style={{ color: "var(--muted)", opacity: 0.55 }}>
                         run id · {runId}
+                      </p>
+                    )}
+                    {pollError && (
+                      <p className="text-[10px] mt-1 font-mono" style={{ color: "#EF4444" }}>⚠ {pollError}</p>
+                    )}
+                    {!pollError && step === "running" && (
+                      <p className="text-[10px] mt-1 font-mono" style={{ color: "var(--muted)", opacity: 0.5 }}>
+                        ● checking supabase every 5s · {pollCount} poll{pollCount !== 1 ? "s" : ""} · {jobStatuses.length} job{jobStatuses.length !== 1 ? "s" : ""} found
                       </p>
                     )}
                   </div>
@@ -715,6 +736,14 @@ export default function VideoAutomation() {
                     {runId && (
                       <p className="text-[10px] mt-1.5 font-mono" style={{ color: "var(--muted)", opacity: 0.55 }}>
                         run id · {runId}
+                      </p>
+                    )}
+                    {pollError && (
+                      <p className="text-[10px] mt-1 font-mono" style={{ color: "#EF4444" }}>⚠ {pollError}</p>
+                    )}
+                    {!pollError && step === "running" && (
+                      <p className="text-[10px] mt-1 font-mono" style={{ color: "var(--muted)", opacity: 0.5 }}>
+                        ● checking supabase every 5s · {pollCount} poll{pollCount !== 1 ? "s" : ""} · {jobStatuses.length} job{jobStatuses.length !== 1 ? "s" : ""} found
                       </p>
                     )}
                   </div>
