@@ -402,62 +402,28 @@ export default function VideoAutomation() {
                     const job = jobStatuses.find(j => normalizeSlug(j.client_slug) === clientName);
                     const isDone   = job?.status === "completed";
                     const isFailed = job?.status === "failed";
-                    const currentMsg = job?.message ?? "Queued";
-                    const currentStepIdx = isDone ? PIPELINE_STEPS.length : messageToStepIdx(job?.message);
-                    const isActive = !isDone && !isFailed;
+                    const isProcessing = !!job && !isDone && !isFailed;
 
                     return (
-                      <motion.div
-                        key={clientName}
-                        layout
-                        className="rounded-2xl overflow-hidden"
+                      <motion.div key={clientName} layout className="rounded-2xl px-5 py-4 flex items-center gap-3"
                         style={{ border: `1.5px solid ${isDone ? "rgba(34,197,94,0.4)" : isFailed ? "rgba(239,68,68,0.4)" : CARD_BORDER}`, background: "var(--surface)" }}
                       >
-                        {/* Card header */}
-                        <div className="flex items-center gap-3 px-5 py-4">
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-bold flex-shrink-0 relative" style={{ background: isDone ? "rgba(34,197,94,0.12)" : isFailed ? "rgba(239,68,68,0.1)" : "rgba(37,99,235,0.1)", color: isDone ? "#22C55E" : isFailed ? "#EF4444" : ACTIVE_COLOR, border: `1px solid ${isDone ? "rgba(34,197,94,0.3)" : isFailed ? "rgba(239,68,68,0.2)" : "rgba(37,99,235,0.2)"}` }}>
-                            {isDone ? "✓" : isFailed ? "✕" : initials(clientName)}
-                            {isActive && (
-                              <span className="absolute inset-0 rounded-xl animate-ping" style={{ background: "rgba(37,99,235,0.15)", animationDuration: "1.5s" }} />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-[13px] font-bold" style={{ color: "var(--text)" }}>{clientName}</p>
-                            <p className="text-[11px]" style={{ color: isDone ? "#22C55E" : isFailed ? "#EF4444" : "var(--muted)" }}>
-                              {isFailed ? "Something went wrong — our team's been notified." : currentMsg}
-                            </p>
-                          </div>
-                          {isDone && job?.video_url && (
-                            <a href={job.video_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold" style={{ background: "rgba(34,197,94,0.1)", color: "#22C55E", border: "1px solid rgba(34,197,94,0.3)" }}>
-                              Watch →
-                            </a>
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-bold flex-shrink-0 relative"
+                          style={{ background: isDone ? "rgba(34,197,94,0.12)" : isFailed ? "rgba(239,68,68,0.1)" : "rgba(37,99,235,0.1)", color: isDone ? "#22C55E" : isFailed ? "#EF4444" : ACTIVE_COLOR, border: `1px solid ${isDone ? "rgba(34,197,94,0.3)" : isFailed ? "rgba(239,68,68,0.2)" : "rgba(37,99,235,0.2)"}` }}>
+                          {isDone ? "✓" : isFailed ? "✕" : initials(clientName)}
+                          {(isProcessing || !job) && <span className="absolute inset-0 rounded-xl animate-ping" style={{ background: "rgba(37,99,235,0.15)", animationDuration: "1.5s" }} />}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[13px] font-bold" style={{ color: "var(--text)" }}>{clientName}</p>
+                          <p className="text-[12px] mt-0.5" style={{ color: isDone ? "#22C55E" : isFailed ? "#EF4444" : "var(--muted)" }}>
+                            {isFailed ? "Something went wrong — our team's been notified." : (job?.message ?? "Queued")}
+                          </p>
+                          {job?.status && !isDone && !isFailed && (
+                            <p className="text-[10px] mt-0.5 font-mono uppercase tracking-widest" style={{ color: "var(--muted)", opacity: 0.5 }}>{job.status}</p>
                           )}
                         </div>
-
-                        {/* Step progress (only for in-progress jobs) */}
-                        {isActive && (
-                          <div className="px-5 pb-4 flex flex-col gap-2" style={{ borderTop: "1px solid var(--border)" }}>
-                            {PIPELINE_STEPS.map((label, i) => {
-                              const isStepDone    = i < currentStepIdx;
-                              const isStepCurrent = i === currentStepIdx;
-                              return (
-                                <div key={i} className="flex items-center gap-3">
-                                  <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{ background: isStepDone ? ACTIVE_COLOR : isStepCurrent ? "transparent" : "var(--bg)", border: isStepDone ? "none" : isStepCurrent ? `2px solid ${ACTIVE_COLOR}` : "2px solid var(--border)" }}>
-                                    {isStepDone && <span className="text-[9px] text-white font-bold">✓</span>}
-                                    {isStepCurrent && (
-                                      <>
-                                        <span className="absolute inset-0 rounded-full animate-spin" style={{ border: `2px solid transparent`, borderTopColor: ACTIVE_COLOR }} />
-                                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: ACTIVE_COLOR }} />
-                                      </>
-                                    )}
-                                  </div>
-                                  <span className="text-[12px]" style={{ color: isStepDone ? "var(--muted)" : isStepCurrent ? "var(--text)" : "var(--border)", fontWeight: isStepCurrent ? 600 : 400 }}>
-                                    {label}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
+                        {isDone && job?.video_url && (
+                          <a href={job.video_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold" style={{ background: "rgba(34,197,94,0.1)", color: "#22C55E", border: "1px solid rgba(34,197,94,0.3)" }}>Watch →</a>
                         )}
                       </motion.div>
                     );
@@ -767,17 +733,14 @@ export default function VideoAutomation() {
                     const isDone   = job?.status === "completed";
                     const isFailed = job?.status === "failed";
                     const currentMsg = job?.message ?? "Queued…";
-                    // Use file_name from Supabase as label when available (e.g. "Awayframes_Wholesome_8Jul2026")
                     const label = job?.file_name ?? templateName;
-                    const currentStepIdx = isDone ? PIPELINE_STEPS.length : messageToStepIdx(job?.message);
-                    const isActive = !isDone && !isFailed;
                     const isQueued = !job;
                     return (
-                      <motion.div key={templateName} layout className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${isDone ? "rgba(34,197,94,0.4)" : isFailed ? "rgba(239,68,68,0.4)" : CARD_BORDER}`, background: "var(--surface)" }}>
-                        <div className="flex items-center gap-3 px-5 py-4">
+                      <motion.div key={templateName} layout className="rounded-2xl px-5 py-4 flex items-center gap-3" style={{ border: `1.5px solid ${isDone ? "rgba(34,197,94,0.4)" : isFailed ? "rgba(239,68,68,0.4)" : CARD_BORDER}`, background: "var(--surface)" }}>
+                        <>
                           <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-bold flex-shrink-0 relative" style={{ background: isDone ? "rgba(34,197,94,0.12)" : isFailed ? "rgba(239,68,68,0.1)" : "rgba(37,99,235,0.1)", color: isDone ? "#22C55E" : isFailed ? "#EF4444" : ACTIVE_COLOR, border: `1px solid ${isDone ? "rgba(34,197,94,0.3)" : isFailed ? "rgba(239,68,68,0.2)" : "rgba(37,99,235,0.2)"}` }}>
                             {isDone ? "✓" : isFailed ? "✕" : label.slice(0,2).toUpperCase()}
-                            {(isActive || isQueued) && <span className="absolute inset-0 rounded-xl animate-ping" style={{ background: "rgba(37,99,235,0.15)", animationDuration: isQueued ? "2s" : "1.5s" }} />}
+                            {(!isDone && !isFailed) && <span className="absolute inset-0 rounded-xl animate-ping" style={{ background: "rgba(37,99,235,0.15)", animationDuration: isQueued ? "2s" : "1.5s" }} />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-[13px] font-bold truncate" style={{ color: "var(--text)" }}>{label}</p>
@@ -787,35 +750,14 @@ export default function VideoAutomation() {
                             <p className="text-[11px]" style={{ color: isDone ? "#22C55E" : isFailed ? "#EF4444" : "var(--muted)" }}>
                               {isFailed ? "Something went wrong — our team's been notified." : currentMsg}
                             </p>
+                            {job?.status && !isDone && !isFailed && (
+                              <p className="text-[10px] mt-0.5 font-mono uppercase tracking-widest" style={{ color: "var(--muted)", opacity: 0.5 }}>{job.status}</p>
+                            )}
                           </div>
                           {isDone && job?.video_url && (
                             <a href={job.video_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold" style={{ background: "rgba(34,197,94,0.1)", color: "#22C55E", border: "1px solid rgba(34,197,94,0.3)" }}>Watch →</a>
                           )}
-                        </div>
-                        {isActive && (
-                          <div className="px-5 pb-4 flex flex-col gap-2" style={{ borderTop: "1px solid var(--border)" }}>
-                            {PIPELINE_STEPS.map((label, i) => {
-                              const isStepDone    = i < currentStepIdx;
-                              const isStepCurrent = i === currentStepIdx;
-                              return (
-                                <div key={i} className="flex items-center gap-3">
-                                  <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{ background: isStepDone ? ACTIVE_COLOR : isStepCurrent ? "transparent" : "var(--bg)", border: isStepDone ? "none" : isStepCurrent ? `2px solid ${ACTIVE_COLOR}` : "2px solid var(--border)" }}>
-                                    {isStepDone && <span className="text-[9px] text-white font-bold">✓</span>}
-                                    {isStepCurrent && (
-                                      <>
-                                        <span className="absolute inset-0 rounded-full animate-spin" style={{ border: `2px solid transparent`, borderTopColor: ACTIVE_COLOR }} />
-                                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: ACTIVE_COLOR }} />
-                                      </>
-                                    )}
-                                  </div>
-                                  <span className="text-[12px]" style={{ color: isStepDone ? "var(--muted)" : isStepCurrent ? "var(--text)" : "var(--border)", fontWeight: isStepCurrent ? 600 : 400 }}>
-                                    {isStepCurrent ? currentMsg : label}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                        </>
                       </motion.div>
                     );
                   })}
