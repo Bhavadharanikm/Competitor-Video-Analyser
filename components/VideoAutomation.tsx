@@ -81,8 +81,9 @@ export default function VideoAutomation() {
 
   const fileKey = headers.find(h => h.toLowerCase().includes("file")) ?? headers[0] ?? "";
   const running = step === "running";
-  const selectedClientNames = Object.keys(selectedClients);
-  const videosToGenerate    = selectedClientNames.length;
+  const selectedClientNames  = Object.keys(selectedClients);
+  const selectedTemplateNames = Object.keys(selectedTemplates).filter(k => selectedTemplates[k]);
+  const videosToGenerate     = mode === "multiple_templates" ? selectedTemplateNames.length : selectedClientNames.length;
 
   useEffect(() => {
     fetch("/api/sheet")
@@ -669,79 +670,289 @@ export default function VideoAutomation() {
               <span style={{ fontSize: 16 }}>←</span> Back
             </button>
 
-            <div className="rounded-2xl p-6" style={{ background: "var(--surface)", border: `1.5px solid ${CARD_BORDER}`, boxShadow: `0 0 24px ${ACTIVE_GLOW}` }}>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(37,99,235,0.1)", border: "1px solid rgba(37,99,235,0.2)" }}>
-                  <span style={{ fontSize: 18 }}>🎬</span>
+            {/* ── JOB TRACKER (shows when running or done) ── */}
+            <AnimatePresence mode="wait">
+            {(step === "running" || step === "done") && (
+              <motion.div
+                key="mt-tracker"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.22 }}
+                className="flex flex-col gap-4 mb-6"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[18px] font-bold" style={{ color: "var(--text)" }}>
+                      {step === "done" ? "Automation complete ✓" : "Running automation…"}
+                    </p>
+                    <p className="text-[12px] mt-0.5" style={{ color: "var(--muted)" }}>
+                      {step === "done"
+                        ? `${jobStatuses.filter(j => j.status === "completed").length} of ${selectedTemplateNames.length} reels ready`
+                        : `Processing ${selectedTemplateNames.length} template${selectedTemplateNames.length !== 1 ? "s" : ""}  ·  ${mtClient}`}
+                    </p>
+                  </div>
+                  {step === "done" && (
+                    <button onClick={handleReset} className="px-4 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer" style={{ border: `1px solid ${ACTIVE_COLOR}`, color: ACTIVE_COLOR, background: "none" }}>
+                      New run →
+                    </button>
+                  )}
+                  {step === "running" && (
+                    <button onClick={handleReset} className="px-4 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer" style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none" }}>
+                      Cancel
+                    </button>
+                  )}
                 </div>
-                <div>
-                  <p className="text-[14px] font-bold" style={{ color: "var(--text)" }}>Multiple Templates</p>
-                  <p className="text-[11px]" style={{ color: "var(--muted)" }}>Many templates, one client.</p>
-                </div>
-              </div>
 
-              <div className="flex flex-col gap-5">
-                <div>
-                  <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--muted)" }}>Client</label>
-                  <select value={mtClient} onChange={e => setMtClient(e.target.value)} disabled={running || propsLoading} className="w-full rounded-[10px] px-4 py-3 text-[13px] font-medium outline-none cursor-pointer disabled:opacity-50" style={{ background: "var(--bg)", border: `1px solid ${ACTIVE_COLOR}`, color: "var(--text)", boxShadow: `0 0 12px ${ACTIVE_GLOW}` }}>
-                    {clientNames.map(n => <option key={n} value={n}>{n}</option>)}
-                  </select>
+                {/* Per-template job cards — show queued placeholders immediately, fill with real data as Supabase responds */}
+                <div className="flex flex-col gap-3">
+                  {selectedTemplateNames.map((templateName) => {
+                    const job = jobStatuses.find(j => j.file_name === templateName || normalizeSlug(j.client_slug) === templateName);
+                    const isDone   = job?.status === "completed";
+                    const isFailed = job?.status === "failed";
+                    const currentMsg = job?.message ?? "Queued…";
+                    const currentStepIdx = isDone ? PIPELINE_STEPS.length : Math.max(0, PIPELINE_STEPS.indexOf(job?.message ?? ""));
+                    const isActive = !!job && !isDone && !isFailed;
+                    const isQueued = !job;
+                    return (
+                      <motion.div key={templateName} layout className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${isDone ? "rgba(34,197,94,0.4)" : isFailed ? "rgba(239,68,68,0.4)" : CARD_BORDER}`, background: "var(--surface)" }}>
+                        <div className="flex items-center gap-3 px-5 py-4">
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-bold flex-shrink-0 relative" style={{ background: isDone ? "rgba(34,197,94,0.12)" : isFailed ? "rgba(239,68,68,0.1)" : "rgba(37,99,235,0.1)", color: isDone ? "#22C55E" : isFailed ? "#EF4444" : ACTIVE_COLOR, border: `1px solid ${isDone ? "rgba(34,197,94,0.3)" : isFailed ? "rgba(239,68,68,0.2)" : "rgba(37,99,235,0.2)"}` }}>
+                            {isDone ? "✓" : isFailed ? "✕" : templateName.slice(0,2).toUpperCase()}
+                            {(isActive || isQueued) && <span className="absolute inset-0 rounded-xl animate-ping" style={{ background: "rgba(37,99,235,0.15)", animationDuration: isQueued ? "2s" : "1.5s" }} />}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-[13px] font-bold" style={{ color: "var(--text)" }}>{templateName}</p>
+                            <p className="text-[11px]" style={{ color: isDone ? "#22C55E" : isFailed ? "#EF4444" : "var(--muted)" }}>
+                              {isFailed ? "Something went wrong — our team's been notified." : currentMsg}
+                            </p>
+                          </div>
+                          {isDone && job?.video_url && (
+                            <a href={job.video_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold" style={{ background: "rgba(34,197,94,0.1)", color: "#22C55E", border: "1px solid rgba(34,197,94,0.3)" }}>Watch →</a>
+                          )}
+                        </div>
+                        {isActive && (
+                          <div className="px-5 pb-4 flex flex-col gap-2" style={{ borderTop: "1px solid var(--border)" }}>
+                            {PIPELINE_STEPS.map((label, i) => {
+                              const isStepDone    = i < currentStepIdx;
+                              const isStepCurrent = i === currentStepIdx;
+                              return (
+                                <div key={i} className="flex items-center gap-3">
+                                  <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 relative" style={{ background: isStepDone ? ACTIVE_COLOR : isStepCurrent ? "transparent" : "var(--bg)", border: isStepDone ? "none" : isStepCurrent ? `2px solid ${ACTIVE_COLOR}` : "2px solid var(--border)" }}>
+                                    {isStepDone && <span className="text-[9px] text-white font-bold">✓</span>}
+                                    {isStepCurrent && (
+                                      <>
+                                        <span className="absolute inset-0 rounded-full animate-spin" style={{ border: `2px solid transparent`, borderTopColor: ACTIVE_COLOR }} />
+                                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: ACTIVE_COLOR }} />
+                                      </>
+                                    )}
+                                  </div>
+                                  <span className="text-[12px]" style={{ color: isStepDone ? "var(--muted)" : isStepCurrent ? "var(--text)" : "var(--border)", fontWeight: isStepCurrent ? 600 : 400 }}>{label}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+            </AnimatePresence>
+
+            {/* ── FORM (hidden while running/done) ── */}
+            {step === "idle" && (
+            <div className="grid gap-6" style={{ gridTemplateColumns: "1fr 420px" }}>
+
+              {/* LEFT — template checklist */}
+              <div className="flex flex-col gap-4 rounded-2xl p-6" style={{ background: "var(--surface)", border: `1.5px solid ${CARD_BORDER}`, boxShadow: `0 0 24px ${ACTIVE_GLOW}` }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(37,99,235,0.1)", border: "1px solid rgba(37,99,235,0.2)" }}>
+                    <span style={{ color: ACTIVE_COLOR, fontSize: 16 }}>🎬</span>
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-bold" style={{ color: "var(--text)" }}>Multiple Templates</p>
+                    <p className="text-[11px]" style={{ color: "var(--muted)" }}>Many templates, one client.</p>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--muted)" }}>Property</label>
-                  <select value={mtProperty} onChange={e => setMtProperty(e.target.value)} disabled={running || mtProperties.length === 0} className="w-full rounded-[10px] px-4 py-3 text-[13px] font-medium outline-none cursor-pointer disabled:opacity-50" style={{ background: "var(--bg)", border: `1px solid ${ACTIVE_COLOR}`, color: "var(--text)", boxShadow: `0 0 12px ${ACTIVE_GLOW}` }}>
-                    {mtProperties.length === 0 ? <option value="">No properties yet</option> : mtProperties.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold tracking-widest uppercase mb-3" style={{ color: "var(--muted)" }}>Competitor Structures (Templates)</label>
-                  {loading ? <div className="h-20 rounded-[10px] animate-pulse" style={{ background: "var(--bg)" }} /> : (
-                    <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: "var(--muted)" }}>
+                      Templates{selectedTemplateNames.length > 0 ? ` · ${selectedTemplateNames.length} chosen` : ""}
+                    </p>
+                    {rows.length > 0 && (
+                      <button
+                        onClick={() => {
+                          const allSelected = rows.every(r => selectedTemplates[r[fileKey]]);
+                          if (allSelected) {
+                            setSelectedTemplates({});
+                          } else {
+                            const all: Record<string, boolean> = {};
+                            rows.forEach(r => { all[r[fileKey]] = true; });
+                            setSelectedTemplates(all);
+                          }
+                        }}
+                        className="text-[11px] font-semibold"
+                        style={{ color: ACTIVE_COLOR }}
+                      >
+                        {rows.every(r => selectedTemplates[r[fileKey]]) ? "Clear all" : "Select all"}
+                      </button>
+                    )}
+                  </div>
+                  {loading ? (
+                    <div className="h-24 rounded-[8px] animate-pulse" style={{ background: "var(--bg)" }} />
+                  ) : (
+                    <div className="flex flex-col overflow-y-auto" style={{ maxHeight: 320 }}>
                       {rows.map((row, i) => {
-                        const key = row[fileKey];
-                        const checked = !!selectedTemplates[key];
+                        const tKey = row[fileKey];
+                        const checked = !!selectedTemplates[tKey];
                         return (
-                          <div key={i} className="flex items-center gap-3 rounded-[10px] px-4 py-3 cursor-pointer select-none transition-all" style={{ background: checked ? "rgba(37,99,235,0.04)" : "var(--bg)", border: `1px solid ${checked ? ACTIVE_COLOR : "var(--border)"}` }} onClick={() => toggleTemplate(key)}>
+                          <div
+                            key={i}
+                            className="flex items-center gap-3 px-2 py-2.5 cursor-pointer select-none rounded-[8px] transition-colors"
+                            style={{ background: checked ? "rgba(37,99,235,0.06)" : "transparent" }}
+                            onClick={() => toggleTemplate(tKey)}
+                          >
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{ background: checked ? "rgba(37,99,235,0.12)" : "var(--surface)", color: checked ? ACTIVE_COLOR : "var(--muted)", border: `1px solid ${checked ? "rgba(37,99,235,0.3)" : "var(--border)"}` }}>
+                              {tKey.slice(0, 2).toUpperCase()}
+                            </div>
+                            <span className="flex-1 text-[13px]" style={{ color: "var(--text)", fontWeight: checked ? 600 : 400 }}>{tKey}</span>
+                            <button
+                              onClick={e => { e.stopPropagation(); const r = rows.find(row => row[fileKey] === tKey); if (r) setDetailRow(r); }}
+                              className="text-[10px] font-semibold cursor-pointer"
+                              style={{ color: "var(--muted)" }}
+                            >details →</button>
                             <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all" style={{ background: checked ? ACTIVE_COLOR : "transparent", border: `1.5px solid ${checked ? ACTIVE_COLOR : "var(--border)"}` }}>
                               {checked && <span className="text-[9px] text-white font-bold leading-none">✓</span>}
                             </div>
-                            <span className="text-[12px]" style={{ color: "var(--text)" }}>{key}</span>
-                            <button onClick={e => { e.stopPropagation(); const r = rows.find(row => row[fileKey] === key); if (r) setDetailRow(r); }} className="ml-auto text-[10px] font-semibold cursor-pointer" style={{ color: "var(--muted)" }}>details →</button>
                           </div>
                         );
                       })}
                     </div>
                   )}
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--muted)" }}>Opening Hook <span style={{ fontWeight: 400 }}>(optional)</span></label>
-                  <textarea value={mtHook} onChange={e => setMtHook(e.target.value)} placeholder="What grabs attention in the first 3 seconds…" rows={3} disabled={running} className="w-full rounded-[10px] px-4 py-3 text-[13px] outline-none resize-none disabled:opacity-50" style={inputStyle} onFocus={focusBorder} onBlur={blurBorder} />
+              {/* RIGHT — client config + run */}
+              <div className="flex flex-col gap-4 rounded-2xl p-6" style={{ background: "var(--surface)", border: "1.5px solid var(--border)" }}>
+
+                {/* Stats row */}
+                <div className="flex items-center justify-between pb-4" style={{ borderBottom: "1px solid var(--border)" }}>
+                  <div>
+                    <p className="text-[11px] font-semibold tracking-widest uppercase mb-0.5" style={{ color: "var(--muted)" }}>Client</p>
+                    <p className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>{mtClient || "—"}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[11px] font-semibold tracking-widest uppercase mb-0.5" style={{ color: "var(--muted)" }}>Videos</p>
+                    <p className="text-[20px] font-bold" style={{ color: videosToGenerate > 0 ? ACTIVE_COLOR : "var(--muted)" }}>{videosToGenerate}</p>
+                  </div>
                 </div>
 
+                {/* Client selector */}
                 <div>
-                  <label className="block text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--muted)" }}>CTA <span style={{ fontWeight: 400 }}>(optional)</span></label>
-                  <input type="text" value={mtCta} onChange={e => setMtCta(e.target.value)} placeholder="What should viewers do next…" disabled={running} className="w-full rounded-[10px] px-4 py-3 text-[13px] outline-none disabled:opacity-50" style={inputStyle} onFocus={focusBorder} onBlur={blurBorder} />
+                  <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>Client</p>
+                  <select
+                    value={mtClient}
+                    onChange={e => setMtClient(e.target.value)}
+                    disabled={propsLoading}
+                    className="w-full rounded-[8px] px-3 py-2.5 text-[13px] font-medium outline-none cursor-pointer disabled:opacity-50"
+                    style={inputStyle}
+                    onFocus={focusBorder}
+                    onBlur={blurBorder}
+                  >
+                    {clientNames.map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
                 </div>
 
-                {errMsg && <p className="text-[12px]" style={{ color: "#EF4444" }}>{errMsg}</p>}
+                {/* Property selector */}
+                <div>
+                  <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>Property</p>
+                  <select
+                    value={mtProperty}
+                    onChange={e => setMtProperty(e.target.value)}
+                    disabled={mtProperties.length === 0}
+                    className="w-full rounded-[8px] px-3 py-2.5 text-[13px] font-medium outline-none cursor-pointer disabled:opacity-50"
+                    style={inputStyle}
+                    onFocus={focusBorder}
+                    onBlur={blurBorder}
+                  >
+                    {mtProperties.length === 0
+                      ? <option value="">No properties yet</option>
+                      : mtProperties.map(p => <option key={p} value={p}>{p}</option>)
+                    }
+                  </select>
+                </div>
 
-                <div className="flex justify-end gap-3">
-                  {step === "done" ? (
-                    <>
-                      <button onClick={handleReset} className="px-6 py-3 rounded-[10px] text-[13px] font-semibold cursor-pointer" style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none" }}>New</button>
-                      <button onClick={handleSubmit} className="px-6 py-3 rounded-[10px] text-[13px] font-bold cursor-pointer" style={{ background: ACTIVE_COLOR, color: "#fff", border: "none" }}>Rerun →</button>
-                    </>
-                  ) : (
-                    <button onClick={running ? handleReset : handleSubmit} className="px-6 py-3 rounded-[10px] text-[13px] font-bold cursor-pointer" style={running ? { border: "1px solid var(--border)", color: "var(--muted)", background: "none" } : { background: ACTIVE_COLOR, color: "#fff", border: "none" }}>
-                      {running ? "Cancel" : "Run Automation →"}
-                    </button>
-                  )}
+                {/* Opening Hook */}
+                <div>
+                  <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>Opening Hook <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span></p>
+                  <textarea
+                    value={mtHook}
+                    onChange={e => setMtHook(e.target.value)}
+                    placeholder="Hook…"
+                    rows={3}
+                    className="w-full rounded-[8px] px-3 py-2.5 text-[13px] outline-none resize-none"
+                    style={inputStyle}
+                    onFocus={focusBorder}
+                    onBlur={blurBorder}
+                  />
+                </div>
+
+                {/* CTA */}
+                <div>
+                  <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>CTA <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span></p>
+                  <input
+                    type="text"
+                    value={mtCta}
+                    onChange={e => setMtCta(e.target.value)}
+                    placeholder="CTA…"
+                    className="w-full rounded-[8px] px-3 py-2.5 text-[13px] outline-none"
+                    style={inputStyle}
+                    onFocus={focusBorder}
+                    onBlur={blurBorder}
+                  />
+                </div>
+
+                {/* Selected template chips */}
+                {selectedTemplateNames.length > 0 && (
+                  <div className="flex flex-col gap-2 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: "var(--muted)" }}>Selected · {selectedTemplateNames.length}</span>
+                      <button onClick={() => setSelectedTemplates({})} className="text-[11px] font-semibold" style={{ color: ACTIVE_COLOR }}>Clear all</button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedTemplateNames.map(name => (
+                        <div key={name} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "var(--bg)", border: `1px solid ${ACTIVE_COLOR}` }}>
+                          <span className="text-[11px] font-medium" style={{ color: "var(--text)" }}>{name}</span>
+                          <button
+                            onClick={() => toggleTemplate(name)}
+                            className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] leading-none"
+                            style={{ background: "var(--border)", color: "var(--muted)" }}
+                          >✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {errMsg && <p className="text-[11px]" style={{ color: "#EF4444" }}>{errMsg}</p>}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSubmit}
+                    disabled={videosToGenerate === 0 || !mtClient}
+                    className="w-full py-3 rounded-[10px] text-[12px] font-bold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{ background: ACTIVE_COLOR, color: "#fff", boxShadow: `0 0 16px ${ACTIVE_GLOW}`, border: "none" }}
+                  >
+                    Run automation →
+                  </button>
                 </div>
               </div>
+
             </div>
+            )} {/* end step === "idle" */}
           </motion.div>
         )}
 
