@@ -216,21 +216,27 @@ export default function VideoAutomation() {
             openingHook: mtHook,
             cta: mtCta,
           };
-    try {
-      const res = await fetch("/api/automate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      clearTimers();
-      if (!res.ok) throw new Error((await res.text()) || `Error ${res.status}`);
-      startPolling(newRunId);
-    } catch (err: unknown) {
-      clearTimers();
+    // Start polling immediately — don't wait for the webhook to respond.
+    // n8n webhooks can be long-running and block until the workflow finishes,
+    // so we fire-and-forget and let polling pick up Supabase updates in real time.
+    startPolling(newRunId);
+
+    fetch("/api/automate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then(async res => {
+      if (!res.ok) {
+        const msg = (await res.text()) || `Error ${res.status}`;
+        stopPolling();
+        setStep("error");
+        setErrMsg(msg);
+      }
+    }).catch(err => {
       stopPolling();
       setStep("error");
       setErrMsg(err instanceof Error ? err.message : "Something went wrong.");
-    }
+    });
   };
 
   const handleReset = () => {
