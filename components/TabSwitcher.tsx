@@ -10,9 +10,9 @@ interface Props {
 }
 
 const tabs: { id: Tab; label: string }[] = [
-  { id: "competitor", label: "🎯 Competitor Analyser" },
-  { id: "client",     label: "✨ Client Analyser"     },
-  { id: "automation", label: "⚡ Video Automation"    },
+  { id: "competitor", label: "🎯 Competitors" },
+  { id: "client",     label: "✨ Clients"     },
+  { id: "automation", label: "⚡ Automation"  },
 ];
 
 export default function TabSwitcher({ active, onChange }: Props) {
@@ -36,10 +36,10 @@ export default function TabSwitcher({ active, onChange }: Props) {
 
   const activeColor =
     active === "competitor" ? "#6366F1" :
-    active === "client"     ? "#00D4A0" : "#F59E0B";
+    active === "client"     ? "#00D4A0" : "#2563EB";
   const activeGlow =
     active === "competitor" ? "rgba(99,102,241,0.25)" :
-    active === "client"     ? "rgba(0,212,160,0.22)"  : "rgba(245,158,11,0.25)";
+    active === "client"     ? "rgba(0,212,160,0.22)"  : "rgba(37,99,235,0.25)";
 
   return (
     <motion.div

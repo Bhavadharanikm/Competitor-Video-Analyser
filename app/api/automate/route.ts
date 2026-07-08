@@ -8,7 +8,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const params = new URLSearchParams();
 
+    // Always pass run_id through as a top-level param so n8n can stamp each Reel_Jobs row
+    if (body.run_id) params.set("run_id", String(body.run_id));
+
     for (const [key, val] of Object.entries(body)) {
+      if (key === "run_id") continue; // already set above
       if (key === "templates" && Array.isArray(val)) {
         // Split into template1, template2, ...
         (val as object[]).forEach((item, i) => {

@@ -61,10 +61,14 @@ export default function Home() {
       <Navbar />
 
       {/* Main content */}
-      <div className="relative z-10 max-w-[1100px] mx-auto px-10 pt-36 pb-20">
+      <div className="relative z-10 max-w-[1440px] mx-auto px-12 pt-24 pb-20">
 
-        <HeroSection activeTab={activeTab} />
-        <TabSwitcher active={activeTab} onChange={handleTabChange} />
+        {/* Mini hero */}
+        <div className="text-center mb-8 pt-6">
+          <p className="text-[11px] font-semibold tracking-widest uppercase mb-3" style={{ color: "var(--muted)" }}>AI Video Analyser</p>
+          <h1 className="text-[32px] font-bold tracking-tight mb-6" style={{ color: "var(--text)", letterSpacing: "-0.02em" }}>What would you like to run?</h1>
+          <TabSwitcher active={activeTab} onChange={handleTabChange} />
+        </div>
         {activeTab === "automation"
           ? <VideoAutomation />
           : <UploadZone activeTab={activeTab} onResult={handleResult} />
