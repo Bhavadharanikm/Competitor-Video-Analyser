@@ -37,6 +37,18 @@ const PIPELINE_STEPS = [
   "Your reel is ready! 🎉",
 ];
 
+function messageToStepIdx(msg: string | null | undefined): number {
+  if (!msg) return 0;
+  const m = msg.toLowerCase();
+  if (m.includes("ready") || m.includes("completed")) return 5;
+  if (m.includes("caption") || m.includes("brand") || m.includes("overlay")) return 4;
+  if (m.includes("music")) return 3;
+  if (m.includes("stitch") || m.includes("compos") || m.includes("merg")) return 2;
+  if (m.includes("trim")) return 1;
+  if (m.includes("select") || m.includes("clip")) return 0;
+  return 0;
+}
+
 function normalizeSlug(slug: string) {
   return slug.replace(/^=/, "").trim();
 }
@@ -344,6 +356,11 @@ export default function VideoAutomation() {
                         ? `${jobStatuses.filter(j => j.status === "completed").length} of ${selectedClientNames.length} reels ready`
                         : `Processing ${selectedClientNames.length} client${selectedClientNames.length !== 1 ? "s" : ""}  ·  ${otTemplate}`}
                     </p>
+                    {runId && (
+                      <p className="text-[10px] mt-1.5 font-mono" style={{ color: "var(--muted)", opacity: 0.55 }}>
+                        run id · {runId}
+                      </p>
+                    )}
                   </div>
                   {step === "done" && (
                     <button onClick={handleReset} className="px-4 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer" style={{ border: `1px solid ${ACTIVE_COLOR}`, color: ACTIVE_COLOR, background: "none" }}>
@@ -359,9 +376,7 @@ export default function VideoAutomation() {
                     const isDone   = job?.status === "completed";
                     const isFailed = job?.status === "failed";
                     const currentMsg = job?.message ?? "Queued";
-                    const currentStepIdx = isDone
-                      ? PIPELINE_STEPS.length
-                      : Math.max(0, PIPELINE_STEPS.indexOf(currentMsg));
+                    const currentStepIdx = isDone ? PIPELINE_STEPS.length : messageToStepIdx(job?.message);
                     const isActive = !isDone && !isFailed;
 
                     return (
@@ -691,6 +706,11 @@ export default function VideoAutomation() {
                         ? `${jobStatuses.filter(j => j.status === "completed").length} of ${selectedTemplateNames.length} reels ready`
                         : `Processing ${selectedTemplateNames.length} template${selectedTemplateNames.length !== 1 ? "s" : ""}  ·  ${mtClient}`}
                     </p>
+                    {runId && (
+                      <p className="text-[10px] mt-1.5 font-mono" style={{ color: "var(--muted)", opacity: 0.55 }}>
+                        run id · {runId}
+                      </p>
+                    )}
                   </div>
                   {step === "done" && (
                     <button onClick={handleReset} className="px-4 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer" style={{ border: `1px solid ${ACTIVE_COLOR}`, color: ACTIVE_COLOR, background: "none" }}>
@@ -706,23 +726,29 @@ export default function VideoAutomation() {
 
                 {/* Per-template job cards — show queued placeholders immediately, fill with real data as Supabase responds */}
                 <div className="flex flex-col gap-3">
-                  {selectedTemplateNames.map((templateName) => {
-                    const job = jobStatuses.find(j => j.file_name === templateName || normalizeSlug(j.client_slug) === templateName);
+                  {selectedTemplateNames.map((templateName, idx) => {
+                    // MT jobs all share the same client_slug — match by arrival order
+                    const job = jobStatuses[idx] ?? null;
                     const isDone   = job?.status === "completed";
                     const isFailed = job?.status === "failed";
                     const currentMsg = job?.message ?? "Queued…";
-                    const currentStepIdx = isDone ? PIPELINE_STEPS.length : Math.max(0, PIPELINE_STEPS.indexOf(job?.message ?? ""));
+                    // Use file_name from Supabase as label when available (e.g. "Awayframes_Wholesome_8Jul2026")
+                    const label = job?.file_name ?? templateName;
+                    const currentStepIdx = isDone ? PIPELINE_STEPS.length : messageToStepIdx(job?.message);
                     const isActive = !!job && !isDone && !isFailed;
                     const isQueued = !job;
                     return (
                       <motion.div key={templateName} layout className="rounded-2xl overflow-hidden" style={{ border: `1.5px solid ${isDone ? "rgba(34,197,94,0.4)" : isFailed ? "rgba(239,68,68,0.4)" : CARD_BORDER}`, background: "var(--surface)" }}>
                         <div className="flex items-center gap-3 px-5 py-4">
                           <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-bold flex-shrink-0 relative" style={{ background: isDone ? "rgba(34,197,94,0.12)" : isFailed ? "rgba(239,68,68,0.1)" : "rgba(37,99,235,0.1)", color: isDone ? "#22C55E" : isFailed ? "#EF4444" : ACTIVE_COLOR, border: `1px solid ${isDone ? "rgba(34,197,94,0.3)" : isFailed ? "rgba(239,68,68,0.2)" : "rgba(37,99,235,0.2)"}` }}>
-                            {isDone ? "✓" : isFailed ? "✕" : templateName.slice(0,2).toUpperCase()}
+                            {isDone ? "✓" : isFailed ? "✕" : label.slice(0,2).toUpperCase()}
                             {(isActive || isQueued) && <span className="absolute inset-0 rounded-xl animate-ping" style={{ background: "rgba(37,99,235,0.15)", animationDuration: isQueued ? "2s" : "1.5s" }} />}
                           </div>
-                          <div className="flex-1">
-                            <p className="text-[13px] font-bold" style={{ color: "var(--text)" }}>{templateName}</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-bold truncate" style={{ color: "var(--text)" }}>{label}</p>
+                            {job?.file_name && label !== templateName && (
+                              <p className="text-[10px] truncate" style={{ color: "var(--muted)", opacity: 0.6 }}>{templateName}</p>
+                            )}
                             <p className="text-[11px]" style={{ color: isDone ? "#22C55E" : isFailed ? "#EF4444" : "var(--muted)" }}>
                               {isFailed ? "Something went wrong — our team's been notified." : currentMsg}
                             </p>
