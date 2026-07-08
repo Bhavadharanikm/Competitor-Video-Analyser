@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       .order("updated_at", { ascending: true });
 
     if (error) return NextResponse.json({ error: error.message, debug: { url, keyPrefix: key.slice(0, 20) } }, { status: 500 });
-    return NextResponse.json({ jobs: data ?? [], debug: { count: data?.length ?? 0, keyPrefix: key.slice(0, 10) } });
+    return NextResponse.json({ jobs: data ?? [], debug: { count: data?.length ?? 0, keyPrefix: key.slice(0, 10), url } });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
