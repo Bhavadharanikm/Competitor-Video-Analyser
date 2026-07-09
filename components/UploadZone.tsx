@@ -218,7 +218,6 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     setStep("idle");
     setErrMsg(null);
     setUrl("");
-    setTrackedRuns([]);
   };
 
   const running   = step === "load" || step === "process" || step === "analyse";
