@@ -53,6 +53,40 @@ function normalizeSlug(slug: string) {
   return slug.replace(/^=/, "").trim();
 }
 
+function StepTrack({ currentIdx, isDone, currentMsg }: { currentIdx: number; isDone: boolean; currentMsg: string }) {
+  return (
+    <div className="mt-3">
+      <div className="flex items-center">
+        {PIPELINE_STEPS.map((_, i) => {
+          const isStepDone    = isDone || i < currentIdx;
+          const isStepCurrent = !isDone && i === currentIdx;
+          return (
+            <div key={i} className="flex items-center" style={{ flex: i < PIPELINE_STEPS.length - 1 ? 1 : "0 0 auto" }}>
+              <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 relative"
+                style={{
+                  background: isStepDone ? "#22C55E" : isStepCurrent ? ACTIVE_COLOR : "var(--bg)",
+                  border: isStepDone || isStepCurrent ? "none" : "2px solid var(--border)",
+                }}>
+                {isStepDone && <span className="text-[11px] text-white font-bold">✓</span>}
+                {isStepCurrent && (
+                  <>
+                    <span className="absolute inset-0 rounded-full animate-ping" style={{ background: ACTIVE_COLOR, opacity: 0.4 }} />
+                    <span className="w-2 h-2 rounded-full" style={{ background: "white" }} />
+                  </>
+                )}
+              </div>
+              {i < PIPELINE_STEPS.length - 1 && (
+                <div className="flex-1 h-[2px]" style={{ background: isStepDone ? "#22C55E" : "var(--border)" }} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[14px] font-bold mt-2" style={{ color: isDone ? "#22C55E" : ACTIVE_COLOR }}>{currentMsg}</p>
+    </div>
+  );
+}
+
 function initials(name: string) {
   const words = name.trim().split(/\s+/);
   if (words.length === 1) return name.slice(0, 2).toUpperCase();
@@ -176,7 +210,7 @@ export default function VideoAutomation() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   };
 
-  const startPolling = (rid: string) => {
+  const startPolling = (rid: string, expectedCount: number) => {
     stopPolling();
     setPollCount(0);
     setPollError(null);
@@ -192,7 +226,9 @@ export default function VideoAutomation() {
         const jobs: ReelJob[] = data.jobs ?? [];
         setPollCount(c => c + 1);
         setJobStatuses(jobs);
-        if (jobs.length > 0 && jobs.every(j => j.status === "completed" || j.status === "failed")) {
+        // Only stop once every expected reel has its own row AND all of them are done/failed —
+        // n8n writes rows one template at a time, so a partial row count means more are still coming.
+        if (jobs.length >= expectedCount && jobs.every(j => j.status === "completed" || j.status === "failed")) {
           stopPolling();
           setStep("done");
         }
@@ -230,7 +266,7 @@ export default function VideoAutomation() {
     // Start polling immediately — don't wait for the webhook to respond.
     // n8n webhooks can be long-running and block until the workflow finishes,
     // so we fire-and-forget and let polling pick up Supabase updates in real time.
-    startPolling(newRunId);
+    startPolling(newRunId, videosToGenerate);
 
     fetch("/api/automate", {
       method: "POST",
@@ -400,30 +436,36 @@ export default function VideoAutomation() {
                 <div className="flex flex-col gap-3">
                   {selectedClientNames.map((clientName) => {
                     const job = jobStatuses.find(j => normalizeSlug(j.client_slug) === clientName);
-                    const isDone   = job?.status === "completed";
-                    const isFailed = job?.status === "failed";
+                    const isDone     = job?.status === "completed";
+                    const isFailed   = job?.status === "failed";
                     const isProcessing = !!job && !isDone && !isFailed;
+                    const currentIdx = isDone ? PIPELINE_STEPS.length : messageToStepIdx(job?.message);
+                    const currentMsg = job?.message ?? "Waiting to start…";
 
                     return (
-                      <motion.div key={clientName} layout className="rounded-2xl px-5 py-4 flex items-center gap-3"
+                      <motion.div key={clientName} layout className="rounded-2xl px-6 py-5 flex items-start gap-4"
                         style={{ border: `1.5px solid ${isDone ? "rgba(34,197,94,0.4)" : isFailed ? "rgba(239,68,68,0.4)" : CARD_BORDER}`, background: "var(--surface)" }}
                       >
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-bold flex-shrink-0 relative"
+                        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-[13px] font-bold flex-shrink-0 relative"
                           style={{ background: isDone ? "rgba(34,197,94,0.12)" : isFailed ? "rgba(239,68,68,0.1)" : "rgba(37,99,235,0.1)", color: isDone ? "#22C55E" : isFailed ? "#EF4444" : ACTIVE_COLOR, border: `1px solid ${isDone ? "rgba(34,197,94,0.3)" : isFailed ? "rgba(239,68,68,0.2)" : "rgba(37,99,235,0.2)"}` }}>
                           {isDone ? "✓" : isFailed ? "✕" : initials(clientName)}
-                          {(isProcessing || !job) && <span className="absolute inset-0 rounded-xl animate-ping" style={{ background: "rgba(37,99,235,0.15)", animationDuration: "1.5s" }} />}
+                          {isProcessing && <span className="absolute inset-0 rounded-xl animate-ping" style={{ background: "rgba(37,99,235,0.15)", animationDuration: "1.5s" }} />}
                         </div>
-                        <div className="flex-1">
-                          <p className="text-[13px] font-bold" style={{ color: "var(--text)" }}>{clientName}</p>
-                          <p className="text-[12px] mt-0.5" style={{ color: isDone ? "#22C55E" : isFailed ? "#EF4444" : "var(--muted)" }}>
-                            {isFailed ? "Something went wrong — our team's been notified." : (job?.message ?? "Queued")}
-                          </p>
-                          {job?.status && !isDone && !isFailed && (
-                            <p className="text-[10px] mt-0.5 font-mono uppercase tracking-widest" style={{ color: "var(--muted)", opacity: 0.5 }}>{job.status}</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-[16px] font-bold" style={{ color: "var(--text)" }}>{clientName}</p>
+                            <span className="text-[11px] font-bold uppercase tracking-widest flex-shrink-0" style={{ color: isDone ? "#22C55E" : isFailed ? "#EF4444" : ACTIVE_COLOR }}>
+                              {isDone ? "Completed" : isFailed ? "Failed" : "Processing"}
+                            </span>
+                          </div>
+                          {isFailed ? (
+                            <p className="text-[13px] mt-1.5" style={{ color: "#EF4444" }}>Something went wrong — our team's been notified.</p>
+                          ) : (
+                            <StepTrack currentIdx={currentIdx} isDone={isDone} currentMsg={currentMsg} />
                           )}
                         </div>
                         {isDone && job?.video_url && (
-                          <a href={job.video_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold" style={{ background: "rgba(34,197,94,0.1)", color: "#22C55E", border: "1px solid rgba(34,197,94,0.3)" }}>Watch →</a>
+                          <a href={job.video_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-semibold flex-shrink-0" style={{ background: "rgba(34,197,94,0.1)", color: "#22C55E", border: "1px solid rgba(34,197,94,0.3)" }}>Watch →</a>
                         )}
                       </motion.div>
                     );
@@ -730,34 +772,36 @@ export default function VideoAutomation() {
                   {selectedTemplateNames.map((templateName, idx) => {
                     // MT jobs all share the same client_slug — match by arrival order
                     const job = jobStatuses[idx] ?? null;
-                    const isDone   = job?.status === "completed";
-                    const isFailed = job?.status === "failed";
-                    const currentMsg = job?.message ?? "Queued…";
-                    const label = job?.file_name ?? templateName;
-                    const isQueued = !job;
+                    const isDone       = job?.status === "completed";
+                    const isFailed     = job?.status === "failed";
+                    const isProcessing = !!job && !isDone && !isFailed;
+                    const currentIdx   = isDone ? PIPELINE_STEPS.length : messageToStepIdx(job?.message);
+                    const currentMsg   = job?.message ?? "Waiting to start…";
                     return (
-                      <motion.div key={templateName} layout className="rounded-2xl px-5 py-4 flex items-center gap-3" style={{ border: `1.5px solid ${isDone ? "rgba(34,197,94,0.4)" : isFailed ? "rgba(239,68,68,0.4)" : CARD_BORDER}`, background: "var(--surface)" }}>
-                        <>
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-bold flex-shrink-0 relative" style={{ background: isDone ? "rgba(34,197,94,0.12)" : isFailed ? "rgba(239,68,68,0.1)" : "rgba(37,99,235,0.1)", color: isDone ? "#22C55E" : isFailed ? "#EF4444" : ACTIVE_COLOR, border: `1px solid ${isDone ? "rgba(34,197,94,0.3)" : isFailed ? "rgba(239,68,68,0.2)" : "rgba(37,99,235,0.2)"}` }}>
-                            {isDone ? "✓" : isFailed ? "✕" : label.slice(0,2).toUpperCase()}
-                            {(!isDone && !isFailed) && <span className="absolute inset-0 rounded-xl animate-ping" style={{ background: "rgba(37,99,235,0.15)", animationDuration: isQueued ? "2s" : "1.5s" }} />}
+                      <motion.div key={templateName} layout className="rounded-2xl px-6 py-5 flex items-start gap-4" style={{ border: `1.5px solid ${isDone ? "rgba(34,197,94,0.4)" : isFailed ? "rgba(239,68,68,0.4)" : CARD_BORDER}`, background: "var(--surface)" }}>
+                        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-[13px] font-bold flex-shrink-0 relative" style={{ background: isDone ? "rgba(34,197,94,0.12)" : isFailed ? "rgba(239,68,68,0.1)" : "rgba(37,99,235,0.1)", color: isDone ? "#22C55E" : isFailed ? "#EF4444" : ACTIVE_COLOR, border: `1px solid ${isDone ? "rgba(34,197,94,0.3)" : isFailed ? "rgba(239,68,68,0.2)" : "rgba(37,99,235,0.2)"}` }}>
+                          {isDone ? "✓" : isFailed ? "✕" : templateName.slice(0,2).toUpperCase()}
+                          {isProcessing && <span className="absolute inset-0 rounded-xl animate-ping" style={{ background: "rgba(37,99,235,0.15)", animationDuration: "1.5s" }} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-[16px] font-bold truncate" style={{ color: "var(--text)" }}>{templateName}</p>
+                              <p className="text-[12px] truncate" style={{ color: "var(--muted)", opacity: 0.7 }}>{mtClient}</p>
+                            </div>
+                            <span className="text-[11px] font-bold uppercase tracking-widest flex-shrink-0" style={{ color: isDone ? "#22C55E" : isFailed ? "#EF4444" : ACTIVE_COLOR }}>
+                              {isDone ? "Completed" : isFailed ? "Failed" : "Processing"}
+                            </span>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-bold truncate" style={{ color: "var(--text)" }}>{label}</p>
-                            {job?.file_name && label !== templateName && (
-                              <p className="text-[10px] truncate" style={{ color: "var(--muted)", opacity: 0.6 }}>{templateName}</p>
-                            )}
-                            <p className="text-[11px]" style={{ color: isDone ? "#22C55E" : isFailed ? "#EF4444" : "var(--muted)" }}>
-                              {isFailed ? "Something went wrong — our team's been notified." : currentMsg}
-                            </p>
-                            {job?.status && !isDone && !isFailed && (
-                              <p className="text-[10px] mt-0.5 font-mono uppercase tracking-widest" style={{ color: "var(--muted)", opacity: 0.5 }}>{job.status}</p>
-                            )}
-                          </div>
-                          {isDone && job?.video_url && (
-                            <a href={job.video_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold" style={{ background: "rgba(34,197,94,0.1)", color: "#22C55E", border: "1px solid rgba(34,197,94,0.3)" }}>Watch →</a>
+                          {isFailed ? (
+                            <p className="text-[13px] mt-1.5" style={{ color: "#EF4444" }}>Something went wrong — our team's been notified.</p>
+                          ) : (
+                            <StepTrack currentIdx={currentIdx} isDone={isDone} currentMsg={currentMsg} />
                           )}
-                        </>
+                        </div>
+                        {isDone && job?.video_url && (
+                          <a href={job.video_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-semibold flex-shrink-0" style={{ background: "rgba(34,197,94,0.1)", color: "#22C55E", border: "1px solid rgba(34,197,94,0.3)" }}>Watch →</a>
+                        )}
                       </motion.div>
                     );
                   })}
