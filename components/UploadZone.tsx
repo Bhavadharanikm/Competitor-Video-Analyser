@@ -29,6 +29,16 @@ const STEPS = [
   { key: "analyse", label: "Analyse", sub: ""                       },
 ];
 
+interface AnalysisJob {
+  id: string;
+  client_slug: string;
+  property_tag: string | null;
+  file_name: string;
+  status: string;
+  message: string;
+  updated_at: string;
+}
+
 export default function UploadZone({ activeTab, onResult }: Props) {
   const [url, setUrl]           = useState("");
   const [step, setStep]         = useState<Step>("idle");
@@ -45,6 +55,9 @@ export default function UploadZone({ activeTab, onResult }: Props) {
   const [propsLoading, setPropsLoading]         = useState(true);
   const [showAddProp, setShowAddProp]           = useState(false);
   const [newPropName, setNewPropName]           = useState("");
+
+  const [history, setHistory]             = useState<AnalysisJob[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -75,6 +88,20 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     setProperties(props);
     setSelectedProperty(props[0] ?? "");
   }, [clientName, allProperties]);
+
+  const fetchHistory = () => {
+    if (activeTab !== "client") return;
+    setHistoryLoading(true);
+    fetch(`/api/analysis-history?clientName=${encodeURIComponent(clientName)}`)
+      .then((r) => r.json())
+      .then((data) => setHistory(data.history ?? []))
+      .catch(() => {})
+      .finally(() => setHistoryLoading(false));
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, [activeTab, clientName]);
 
   const handleAddClient = () => {
     const name = newClientName.trim();
@@ -129,17 +156,25 @@ export default function UploadZone({ activeTab, onResult }: Props) {
       const res = await fetch("/api/analyse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, type: activeTab, ...(activeTab === "client" ? { clientName, property: selectedProperty } : {}) }),
+        body: JSON.stringify({
+          ...payload,
+          type: activeTab,
+          ...(activeTab === "client"
+            ? { run_id: crypto.randomUUID(), fileName: displayName, clientName, property: selectedProperty }
+            : {}),
+        }),
       });
       clearTimers();
       if (!res.ok) throw new Error((await res.text()) || `Error ${res.status}`);
       const data = await res.json();
       setStep("done");
       onResult(data, displayName);
+      fetchHistory();
     } catch (err: unknown) {
       clearTimers();
       setStep("error");
       setErrMsg(err instanceof Error ? err.message : "Something went wrong.");
+      fetchHistory();
     }
   };
 
@@ -485,6 +520,58 @@ export default function UploadZone({ activeTab, onResult }: Props) {
           );
         })}
       </div>
+
+      {/* Recent analyses — Client tab only */}
+      {activeTab === "client" && (
+        <div className="px-7 py-5" style={{ borderTop: "1px solid var(--border)" }}>
+          <p className="text-[11px] font-semibold tracking-widest uppercase mb-3" style={{ color: "var(--muted)" }}>
+            Recent Analyses — {clientName}
+          </p>
+          {historyLoading && history.length === 0 ? (
+            <div className="flex flex-col gap-2">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="h-14 rounded-[10px] animate-pulse" style={{ background: "var(--surface2)" }} />
+              ))}
+            </div>
+          ) : history.length === 0 ? (
+            <p className="text-[12px]" style={{ color: "var(--muted)", opacity: 0.6 }}>No analyses yet for this client.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {history.map((job) => {
+                const isDone   = job.status === "completed";
+                const isFailed = job.status === "failed";
+                return (
+                  <div
+                    key={job.id}
+                    className="flex items-center gap-3 rounded-[10px] px-4 py-3"
+                    style={{ background: "var(--bg)", border: "1px solid var(--border)" }}
+                  >
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+                      style={{
+                        background: isDone ? "rgba(34,197,94,0.12)" : isFailed ? "rgba(239,68,68,0.1)" : activeGlow,
+                        color: isDone ? "#22C55E" : isFailed ? "#EF4444" : activeColor,
+                        border: `1px solid ${isDone ? "rgba(34,197,94,0.3)" : isFailed ? "rgba(239,68,68,0.2)" : activeColor}`,
+                      }}
+                    >
+                      {isDone ? "✓" : isFailed ? "✕" : "…"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-semibold truncate" style={{ color: "var(--text)" }}>{job.file_name}</p>
+                      <p className="text-[11px]" style={{ color: isDone ? "#22C55E" : isFailed ? "#EF4444" : "var(--muted)" }}>
+                        {job.message}
+                      </p>
+                    </div>
+                    <p className="text-[10px] font-mono flex-shrink-0" style={{ color: "var(--muted)", opacity: 0.5 }}>
+                      {new Date(job.updated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }

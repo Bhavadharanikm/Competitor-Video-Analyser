@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const WEBHOOKS: Record<string, string> = {
   competitor: "https://n8n.srv1597665.hstgr.cloud/webhook/instagram-analyser",
-  client:     "https://n8n.srv1597665.hstgr.cloud/webhook/Instagram_Analyser",
+  client:     "https://n8n.srv1597665.hstgr.cloud/webhook/Client_Analyser",
 };
 
 export async function POST(req: NextRequest) {
