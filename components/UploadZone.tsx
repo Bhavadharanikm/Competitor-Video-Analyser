@@ -92,21 +92,23 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     setTrackedRuns([]);
   }, [activeTab, clientName]);
 
-  const pollRun = (runId: string) => {
-    fetch(`/api/jobs?runId=${runId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const job = (data.jobs ?? [])[0];
-        if (!job) return;
-        setTrackedRuns((prev) =>
-          prev.map((r) =>
-            r.run_id === runId
-              ? { ...r, file_name: job.file_name || r.file_name, status: job.status, message: job.message, updated_at: job.updated_at }
-              : r
-          )
-        );
-      })
-      .catch(() => {});
+  const pollRun = async (runId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/jobs?runId=${runId}`);
+      const data = await res.json();
+      const job = (data.jobs ?? [])[0];
+      if (!job) return false;
+      setTrackedRuns((prev) =>
+        prev.map((r) =>
+          r.run_id === runId
+            ? { ...r, file_name: job.file_name || r.file_name, status: job.status, message: job.message, updated_at: job.updated_at }
+            : r
+        )
+      );
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const handleAddClient = () => {
@@ -199,7 +201,15 @@ export default function UploadZone({ activeTab, onResult }: Props) {
       setStep("error");
       setErrMsg(err instanceof Error ? err.message : "Something went wrong.");
       if (newRunId) {
-        setTrackedRuns((prev) => prev.map((r) => (r.run_id === newRunId ? { ...r, status: "failed", message: "Analysis failed" } : r)));
+        // Prefer the real error n8n wrote to Reel_Jobs; only fall back to a generic message if it wrote nothing.
+        const gotJob = await pollRun(newRunId);
+        setTrackedRuns((prev) =>
+          prev.map((r) =>
+            r.run_id === newRunId
+              ? { ...r, status: "failed", message: gotJob ? r.message : "Analysis failed" }
+              : r
+          )
+        );
       }
     } finally {
       if (historyPollRef.current) { clearInterval(historyPollRef.current); historyPollRef.current = null; }
@@ -581,6 +591,9 @@ export default function UploadZone({ activeTab, onResult }: Props) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[12px] font-semibold truncate" style={{ color: "var(--text)" }}>{job.file_name || "Untitled clip"}</p>
+                      {isFailed && job.message && (
+                        <p className="text-[11px] truncate mt-0.5" style={{ color: "#EF4444" }}>{job.message}</p>
+                      )}
                     </div>
                     <p className="text-[10px] font-mono flex-shrink-0" style={{ color: "var(--muted)", opacity: 0.5 }}>
                       {new Date(job.updated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
