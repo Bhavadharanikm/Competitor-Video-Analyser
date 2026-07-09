@@ -29,10 +29,8 @@ const STEPS = [
   { key: "analyse", label: "Analyse", sub: ""                       },
 ];
 
-interface AnalysisJob {
-  id: string;
-  client_slug: string;
-  property_tag: string | null;
+interface TrackedRun {
+  run_id: string;
   file_name: string;
   status: string;
   message: string;
@@ -56,8 +54,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
   const [showAddProp, setShowAddProp]           = useState(false);
   const [newPropName, setNewPropName]           = useState("");
 
-  const [history, setHistory]             = useState<AnalysisJob[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [trackedRuns, setTrackedRuns] = useState<TrackedRun[]>([]);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const historyPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -90,19 +87,27 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     setSelectedProperty(props[0] ?? "");
   }, [clientName, allProperties]);
 
-  const fetchHistory = () => {
-    if (activeTab !== "client") return;
-    setHistoryLoading(true);
-    fetch(`/api/analysis-history?clientName=${encodeURIComponent(clientName)}`)
-      .then((r) => r.json())
-      .then((data) => setHistory(data.history ?? []))
-      .catch(() => {})
-      .finally(() => setHistoryLoading(false));
-  };
-
+  // Only track runs started in this session — switching client/tab starts fresh, no historical rows.
   useEffect(() => {
-    fetchHistory();
+    setTrackedRuns([]);
   }, [activeTab, clientName]);
+
+  const pollRun = (runId: string) => {
+    fetch(`/api/jobs?runId=${runId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const job = (data.jobs ?? [])[0];
+        if (!job) return;
+        setTrackedRuns((prev) =>
+          prev.map((r) =>
+            r.run_id === runId
+              ? { ...r, file_name: job.file_name || r.file_name, status: job.status, message: job.message, updated_at: job.updated_at }
+              : r
+          )
+        );
+      })
+      .catch(() => {});
+  };
 
   const handleAddClient = () => {
     const name = newClientName.trim();
@@ -153,12 +158,20 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     triggerScanBeam();
     fakeProgress();
 
-    // The analyse webhook blocks until n8n finishes, so poll Reel_Jobs in the
-    // background to show the row n8n writes (and later updates) in real time.
+    // The analyse webhook blocks until n8n finishes, so poll this run's Reel_Jobs
+    // row in the background to show live progress. Only this session's runs are
+    // tracked — never pull in a client's older, unrelated analysis history.
+    let newRunId: string | null = null;
     if (activeTab === "client") {
-      fetchHistory();
+      newRunId = crypto.randomUUID();
+      const runId = newRunId;
+      setTrackedRuns((prev) => [
+        ...prev,
+        { run_id: runId, file_name: displayName, status: "processing", message: "Analyzing…", updated_at: new Date().toISOString() },
+      ]);
       if (historyPollRef.current) clearInterval(historyPollRef.current);
-      historyPollRef.current = setInterval(fetchHistory, 5000);
+      pollRun(runId);
+      historyPollRef.current = setInterval(() => pollRun(runId), 5000);
     }
 
     try {
@@ -169,7 +182,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
           ...payload,
           type: activeTab,
           ...(activeTab === "client"
-            ? { run_id: crypto.randomUUID(), fileName: displayName, clientName, property: selectedProperty }
+            ? { run_id: newRunId, fileName: displayName, clientName, property: selectedProperty }
             : {}),
         }),
       });
@@ -178,13 +191,18 @@ export default function UploadZone({ activeTab, onResult }: Props) {
       const data = await res.json();
       setStep("done");
       onResult(data, displayName);
+      if (newRunId) {
+        setTrackedRuns((prev) => prev.map((r) => (r.run_id === newRunId ? { ...r, status: "completed" } : r)));
+      }
     } catch (err: unknown) {
       clearTimers();
       setStep("error");
       setErrMsg(err instanceof Error ? err.message : "Something went wrong.");
+      if (newRunId) {
+        setTrackedRuns((prev) => prev.map((r) => (r.run_id === newRunId ? { ...r, status: "failed", message: "Analysis failed" } : r)));
+      }
     } finally {
       if (historyPollRef.current) { clearInterval(historyPollRef.current); historyPollRef.current = null; }
-      fetchHistory();
     }
   };
 
@@ -200,7 +218,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     setStep("idle");
     setErrMsg(null);
     setUrl("");
-    setHistory([]);
+    setTrackedRuns([]);
   };
 
   const running   = step === "load" || step === "process" || step === "analyse";
@@ -539,22 +557,16 @@ export default function UploadZone({ activeTab, onResult }: Props) {
           <p className="text-[11px] font-semibold tracking-widest uppercase mb-3" style={{ color: "var(--muted)" }}>
             Tracking — {clientName}
           </p>
-          {historyLoading && history.length === 0 ? (
-            <div className="flex flex-col gap-2">
-              {[0, 1, 2].map(i => (
-                <div key={i} className="h-14 rounded-[10px] animate-pulse" style={{ background: "var(--surface2)" }} />
-              ))}
-            </div>
-          ) : history.length === 0 ? (
+          {trackedRuns.length === 0 ? (
             <p className="text-[12px]" style={{ color: "var(--muted)", opacity: 0.6 }}>No videos analysed yet.</p>
           ) : (
             <div className="flex flex-col gap-2">
-              {[...history].reverse().map((job) => {
+              {trackedRuns.map((job) => {
                 const isDone   = job.status === "completed";
                 const isFailed = job.status === "failed";
                 return (
                   <div
-                    key={job.id}
+                    key={job.run_id}
                     className="flex items-center gap-3 rounded-[10px] px-4 py-3"
                     style={{ background: "var(--bg)", border: "1px solid var(--border)" }}
                   >
