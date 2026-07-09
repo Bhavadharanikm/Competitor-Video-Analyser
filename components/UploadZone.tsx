@@ -60,6 +60,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const historyPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("clientNames");
@@ -152,6 +153,14 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     triggerScanBeam();
     fakeProgress();
 
+    // The analyse webhook blocks until n8n finishes, so poll Reel_Jobs in the
+    // background to show the row n8n writes (and later updates) in real time.
+    if (activeTab === "client") {
+      fetchHistory();
+      if (historyPollRef.current) clearInterval(historyPollRef.current);
+      historyPollRef.current = setInterval(fetchHistory, 5000);
+    }
+
     try {
       const res = await fetch("/api/analyse", {
         method: "POST",
@@ -169,11 +178,12 @@ export default function UploadZone({ activeTab, onResult }: Props) {
       const data = await res.json();
       setStep("done");
       onResult(data, displayName);
-      fetchHistory();
     } catch (err: unknown) {
       clearTimers();
       setStep("error");
       setErrMsg(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      if (historyPollRef.current) { clearInterval(historyPollRef.current); historyPollRef.current = null; }
       fetchHistory();
     }
   };
@@ -186,6 +196,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
 
   const handleReset = () => {
     clearTimers();
+    if (historyPollRef.current) { clearInterval(historyPollRef.current); historyPollRef.current = null; }
     setStep("idle");
     setErrMsg(null);
     setUrl("");
@@ -522,11 +533,11 @@ export default function UploadZone({ activeTab, onResult }: Props) {
         })}
       </div>
 
-      {/* Recent analyses — Client tab only */}
+      {/* Analysis tracker — Client tab only */}
       {activeTab === "client" && (
         <div className="px-7 py-5" style={{ borderTop: "1px solid var(--border)" }}>
           <p className="text-[11px] font-semibold tracking-widest uppercase mb-3" style={{ color: "var(--muted)" }}>
-            Recent Analyses — {clientName}
+            Tracking — {clientName}
           </p>
           {historyLoading && history.length === 0 ? (
             <div className="flex flex-col gap-2">
@@ -535,10 +546,10 @@ export default function UploadZone({ activeTab, onResult }: Props) {
               ))}
             </div>
           ) : history.length === 0 ? (
-            <p className="text-[12px]" style={{ color: "var(--muted)", opacity: 0.6 }}>No analyses yet for this client.</p>
+            <p className="text-[12px]" style={{ color: "var(--muted)", opacity: 0.6 }}>No videos analysed yet.</p>
           ) : (
             <div className="flex flex-col gap-2">
-              {history.map((job) => {
+              {[...history].reverse().map((job) => {
                 const isDone   = job.status === "completed";
                 const isFailed = job.status === "failed";
                 return (
