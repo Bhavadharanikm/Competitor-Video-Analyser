@@ -189,6 +189,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     setStep("idle");
     setErrMsg(null);
     setUrl("");
+    setHistory([]);
   };
 
   const running   = step === "load" || step === "process" || step === "analyse";
@@ -557,10 +558,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
                       {isDone ? "✓" : isFailed ? "✕" : "…"}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-semibold truncate" style={{ color: "var(--text)" }}>{job.file_name}</p>
-                      <p className="text-[11px]" style={{ color: isDone ? "#22C55E" : isFailed ? "#EF4444" : "var(--muted)" }}>
-                        {job.message}
-                      </p>
+                      <p className="text-[12px] font-semibold truncate" style={{ color: "var(--text)" }}>{job.file_name || "Untitled clip"}</p>
                     </div>
                     <p className="text-[10px] font-mono flex-shrink-0" style={{ color: "var(--muted)", opacity: 0.5 }}>
                       {new Date(job.updated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
