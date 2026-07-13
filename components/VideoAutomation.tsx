@@ -93,6 +93,26 @@ function initials(name: string) {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
+interface CreatomateTemplate {
+  template_id:        string;
+  template_name:      string;
+  thumbnail_url:       string | null;
+  video_element_name: string | null;
+  text_element_name:  string | null;
+  updated_at:          string;
+}
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} minute${mins !== 1 ? "s" : ""} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours !== 1 ? "s" : ""} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days !== 1 ? "s" : ""} ago`;
+}
+
 export default function VideoAutomation() {
   const [rows, setRows]             = useState<SheetRow[]>([]);
   const [headers, setHeaders]       = useState<string[]>([]);
@@ -127,11 +147,17 @@ export default function VideoAutomation() {
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const pollRef   = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [creatomateTemplates, setCreatomateTemplates] = useState<CreatomateTemplate[]>([]);
+  const [selectedCreatomateId, setSelectedCreatomateId] = useState<string | null>(null);
+  // MT needs one style per selected sheet-template, keyed by that template's row key.
+  const [mtCreatomateStyles, setMtCreatomateStyles] = useState<Record<string, string>>({});
+
   const fileKey = headers.find(h => h.toLowerCase().includes("file")) ?? headers[0] ?? "";
   const running = step === "running";
   const selectedClientNames  = Object.keys(selectedClients);
   const selectedTemplateNames = Object.keys(selectedTemplates).filter(k => selectedTemplates[k]);
   const videosToGenerate     = mode === "multiple_templates" ? selectedTemplateNames.length : selectedClientNames.length;
+  const allMtStylesAssigned  = selectedTemplateNames.length > 0 && selectedTemplateNames.every(tKey => !!mtCreatomateStyles[tKey]);
 
   useEffect(() => {
     fetch("/api/sheet")
@@ -173,6 +199,13 @@ export default function VideoAutomation() {
     setMtProperties(props);
     setMtProperty(props[0] ?? "");
   }, [mtClient, allProperties]);
+
+  useEffect(() => {
+    fetch("/api/creatomate-templates")
+      .then(r => r.json())
+      .then(data => setCreatomateTemplates(data.templates ?? []))
+      .catch(() => {});
+  }, []);
 
   const toggleClient = (name: string) => {
     setSelectedClients(prev => {
@@ -246,6 +279,7 @@ export default function VideoAutomation() {
     setJobStatuses([]);
     setStep("running");
     setErrMsg(null);
+    const selectedCreatomateTemplate = creatomateTemplates.find(t => t.template_id === selectedCreatomateId) ?? null;
     const payload =
       mode === "one_template"
         ? {
@@ -253,13 +287,24 @@ export default function VideoAutomation() {
             mode: "one_template",
             template: rows.find(r => r[fileKey] === otTemplate) ?? null,
             clients: Object.entries(selectedClients).map(([clientName, entry]) => ({ clientName, ...entry })),
+            creatomate_template_id:    selectedCreatomateTemplate?.template_id ?? null,
+            creatomate_video_element:  selectedCreatomateTemplate?.video_element_name ?? null,
+            creatomate_text_element:   selectedCreatomateTemplate?.text_element_name ?? null,
           }
         : {
             run_id: newRunId,
             mode: "multiple_templates",
             clientName: mtClient,
             property: mtProperty,
-            templates: rows.filter(r => selectedTemplates[r[fileKey]]),
+            templates: rows.filter(r => selectedTemplates[r[fileKey]]).map(r => {
+              const style = creatomateTemplates.find(t => t.template_id === mtCreatomateStyles[r[fileKey]]) ?? null;
+              return {
+                ...r,
+                creatomate_template_id:   style?.template_id ?? null,
+                creatomate_video_element: style?.video_element_name ?? null,
+                creatomate_text_element:  style?.text_element_name ?? null,
+              };
+            }),
             openingHook: mtHook,
             cta: mtCta,
           };
@@ -477,6 +522,7 @@ export default function VideoAutomation() {
 
             {/* ── FORM (hidden while running/done) ── */}
             {step === "idle" && (
+            <>
             <div className="grid gap-6" style={{ gridTemplateColumns: "1fr 420px" }}>
 
               {/* LEFT */}
@@ -702,6 +748,50 @@ export default function VideoAutomation() {
               </div>
 
             </div>
+
+            {/* Creatomate template gallery — pick which render template this run uses */}
+            {creatomateTemplates.length > 0 && (
+              <div className="mt-6">
+                <p className="text-[11px] font-semibold tracking-widest uppercase mb-3" style={{ color: "var(--muted)" }}>
+                  Template Styles
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {creatomateTemplates.map(t => {
+                    const isSelected = selectedCreatomateId === t.template_id;
+                    return (
+                      <button
+                        key={t.template_id}
+                        onClick={() => setSelectedCreatomateId(isSelected ? null : t.template_id)}
+                        className="rounded-xl overflow-hidden text-left cursor-pointer flex-shrink-0"
+                        style={{
+                          width: 190,
+                          background: "var(--surface)",
+                          border: `1.5px solid ${isSelected ? ACTIVE_COLOR : "var(--border)"}`,
+                          boxShadow: isSelected ? `0 0 16px ${ACTIVE_GLOW}` : "none",
+                          transition: "border-color 0.15s, box-shadow 0.15s",
+                        }}
+                      >
+                        <div className="w-full flex items-center justify-center relative" style={{ aspectRatio: "9 / 16", background: "var(--bg)" }}>
+                          {t.thumbnail_url ? (
+                            <img src={t.thumbnail_url} alt={t.template_name} className="w-full h-full object-cover" />
+                          ) : (
+                            <span style={{ color: "var(--muted)", fontSize: 26 }}>🎬</span>
+                          )}
+                          {isSelected && (
+                            <span className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold" style={{ background: ACTIVE_COLOR, color: "#fff" }}>✓</span>
+                          )}
+                        </div>
+                        <div className="px-3 py-2.5">
+                          <p className="text-[13px] font-bold truncate" style={{ color: "var(--text)" }}>{t.template_name}</p>
+                          <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>Edited {timeAgo(t.updated_at)}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            </>
             )} {/* end step === "idle" */}
           </motion.div>
         )}
@@ -812,6 +902,7 @@ export default function VideoAutomation() {
 
             {/* ── FORM (hidden while running/done) ── */}
             {step === "idle" && (
+            <>
             <div className="grid gap-6" style={{ gridTemplateColumns: "1fr 420px" }}>
 
               {/* LEFT — template checklist */}
@@ -991,7 +1082,7 @@ export default function VideoAutomation() {
                 <div className="flex gap-2">
                   <button
                     onClick={handleSubmit}
-                    disabled={videosToGenerate === 0 || !mtClient}
+                    disabled={videosToGenerate === 0 || !mtClient || !allMtStylesAssigned}
                     className="w-full py-3 rounded-[10px] text-[12px] font-bold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{ background: ACTIVE_COLOR, color: "#fff", boxShadow: `0 0 16px ${ACTIVE_GLOW}`, border: "none" }}
                   >
@@ -1001,6 +1092,61 @@ export default function VideoAutomation() {
               </div>
 
             </div>
+
+            {/* Per-template Creatomate style pickers — one mandatory style per selected template */}
+            {creatomateTemplates.length > 0 && selectedTemplateNames.length > 0 && (
+              <div className="mt-6 flex flex-col gap-5">
+                {selectedTemplateNames.map(tKey => {
+                  const assignedId = mtCreatomateStyles[tKey];
+                  return (
+                    <div key={tKey}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <p className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: "var(--muted)" }}>
+                          Template Style — {tKey}
+                        </p>
+                        {!assignedId && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: "rgba(239,68,68,0.1)", color: "#EF4444" }}>required</span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        {creatomateTemplates.map(t => {
+                          const isSelected = assignedId === t.template_id;
+                          return (
+                            <button
+                              key={t.template_id}
+                              onClick={() => setMtCreatomateStyles(prev => ({ ...prev, [tKey]: t.template_id }))}
+                              className="rounded-xl overflow-hidden text-left cursor-pointer flex-shrink-0"
+                              style={{
+                                width: 150,
+                                background: "var(--surface)",
+                                border: `1.5px solid ${isSelected ? ACTIVE_COLOR : "var(--border)"}`,
+                                boxShadow: isSelected ? `0 0 16px ${ACTIVE_GLOW}` : "none",
+                                transition: "border-color 0.15s, box-shadow 0.15s",
+                              }}
+                            >
+                              <div className="w-full flex items-center justify-center relative" style={{ aspectRatio: "9 / 16", background: "var(--bg)" }}>
+                                {t.thumbnail_url ? (
+                                  <img src={t.thumbnail_url} alt={t.template_name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span style={{ color: "var(--muted)", fontSize: 22 }}>🎬</span>
+                                )}
+                                {isSelected && (
+                                  <span className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold" style={{ background: ACTIVE_COLOR, color: "#fff" }}>✓</span>
+                                )}
+                              </div>
+                              <div className="px-3 py-2.5">
+                                <p className="text-[12px] font-bold truncate" style={{ color: "var(--text)" }}>{t.template_name}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            </>
             )} {/* end step === "idle" */}
           </motion.div>
         )}
