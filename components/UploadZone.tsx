@@ -24,9 +24,9 @@ const step3Sub: Record<Tab, string> = {
 
 type Step = "idle" | "load" | "process" | "analyse" | "done" | "error";
 const STEPS = [
-  { key: "load",    label: "Load",    sub: "Reading your video"    },
-  { key: "process", label: "Process", sub: "Saving to Google Drive" },
-  { key: "analyse", label: "Analyse", sub: ""                       },
+  { key: "load",    label: "Load",    sub: "Uploading your video" },
+  { key: "process", label: "Process", sub: "Reading your video"   },
+  { key: "analyse", label: "Analyse", sub: ""                      },
 ];
 
 interface TrackedRun {
@@ -151,7 +151,6 @@ export default function UploadZone({ activeTab, onResult }: Props) {
 
   const triggerScanBeam = () => {
     setScanning(true);
-    setTimeout(() => setScanning(false), 2100);
   };
 
   const runAnalysis = async (payload: Record<string, unknown>, displayName: string) => {
@@ -213,6 +212,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
       }
     } finally {
       if (historyPollRef.current) { clearInterval(historyPollRef.current); historyPollRef.current = null; }
+      setScanning(false);
     }
   };
 
@@ -228,6 +228,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
     setStep("idle");
     setErrMsg(null);
     setUrl("");
+    setScanning(false);
   };
 
   const running   = step === "load" || step === "process" || step === "analyse";
@@ -465,7 +466,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
           style={{
             width: "60%",
             background: `linear-gradient(90deg, transparent, ${activeGlow}, transparent)`,
-            animation: scanning ? "scan 2s ease-in-out" : "none",
+            animation: scanning ? "scan 2s ease-in-out infinite" : "none",
             left: scanning ? undefined : "-100%",
           }}
         />
