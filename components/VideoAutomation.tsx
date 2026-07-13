@@ -944,29 +944,57 @@ export default function VideoAutomation() {
                   {loading ? (
                     <div className="h-24 rounded-[8px] animate-pulse" style={{ background: "var(--bg)" }} />
                   ) : (
-                    <div className="flex flex-col overflow-y-auto" style={{ maxHeight: 320 }}>
+                    <div className="flex flex-col overflow-y-auto" style={{ maxHeight: 420 }}>
                       {rows.map((row, i) => {
                         const tKey = row[fileKey];
                         const checked = !!selectedTemplates[tKey];
+                        const assignedId = mtCreatomateStyles[tKey];
+                        const assignedStyle = creatomateTemplates.find(t => t.template_id === assignedId) ?? null;
                         return (
-                          <div
-                            key={i}
-                            className="flex items-center gap-3 px-2 py-2.5 cursor-pointer select-none rounded-[8px] transition-colors"
-                            style={{ background: checked ? "rgba(37,99,235,0.06)" : "transparent" }}
-                            onClick={() => toggleTemplate(tKey)}
-                          >
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{ background: checked ? "rgba(37,99,235,0.12)" : "var(--surface)", color: checked ? ACTIVE_COLOR : "var(--muted)", border: `1px solid ${checked ? "rgba(37,99,235,0.3)" : "var(--border)"}` }}>
-                              {tKey.slice(0, 2).toUpperCase()}
+                          <div key={i} className="rounded-[8px] transition-colors" style={{ background: checked ? "rgba(37,99,235,0.06)" : "transparent" }}>
+                            <div
+                              className="flex items-center gap-3 px-2 py-2.5 cursor-pointer select-none"
+                              onClick={() => toggleTemplate(tKey)}
+                            >
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{ background: checked ? "rgba(37,99,235,0.12)" : "var(--surface)", color: checked ? ACTIVE_COLOR : "var(--muted)", border: `1px solid ${checked ? "rgba(37,99,235,0.3)" : "var(--border)"}` }}>
+                                {tKey.slice(0, 2).toUpperCase()}
+                              </div>
+                              <span className="flex-1 text-[13px]" style={{ color: "var(--text)", fontWeight: checked ? 600 : 400 }}>{tKey}</span>
+                              <button
+                                onClick={e => { e.stopPropagation(); const r = rows.find(row => row[fileKey] === tKey); if (r) setDetailRow(r); }}
+                                className="text-[10px] font-semibold cursor-pointer"
+                                style={{ color: "var(--muted)" }}
+                              >details →</button>
+                              <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all" style={{ background: checked ? ACTIVE_COLOR : "transparent", border: `1.5px solid ${checked ? ACTIVE_COLOR : "var(--border)"}` }}>
+                                {checked && <span className="text-[9px] text-white font-bold leading-none">✓</span>}
+                              </div>
                             </div>
-                            <span className="flex-1 text-[13px]" style={{ color: "var(--text)", fontWeight: checked ? 600 : 400 }}>{tKey}</span>
-                            <button
-                              onClick={e => { e.stopPropagation(); const r = rows.find(row => row[fileKey] === tKey); if (r) setDetailRow(r); }}
-                              className="text-[10px] font-semibold cursor-pointer"
-                              style={{ color: "var(--muted)" }}
-                            >details →</button>
-                            <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all" style={{ background: checked ? ACTIVE_COLOR : "transparent", border: `1.5px solid ${checked ? ACTIVE_COLOR : "var(--border)"}` }}>
-                              {checked && <span className="text-[9px] text-white font-bold leading-none">✓</span>}
-                            </div>
+
+                            {/* Inline Creatomate style picker — appears once this template is selected */}
+                            {checked && creatomateTemplates.length > 0 && (
+                              <div className="flex items-center gap-2 pl-11 pr-2 pb-2.5" onClick={e => e.stopPropagation()}>
+                                <select
+                                  value={assignedId ?? ""}
+                                  onChange={e => setMtCreatomateStyles(prev => ({ ...prev, [tKey]: e.target.value }))}
+                                  className="flex-1 rounded-[6px] px-2 py-1.5 text-[11px] font-medium outline-none cursor-pointer"
+                                  style={{ background: "var(--bg)", border: `1px solid ${assignedId ? "var(--border)" : "#EF4444"}`, color: "var(--text)" }}
+                                >
+                                  <option value="" disabled>Select a template style…</option>
+                                  {creatomateTemplates.map(t => (
+                                    <option key={t.template_id} value={t.template_id}>{t.template_name}</option>
+                                  ))}
+                                </select>
+                                {assignedStyle?.thumbnail_url && (
+                                  <img
+                                    src={assignedStyle.thumbnail_url}
+                                    alt={assignedStyle.template_name}
+                                    className="w-6 h-11 rounded object-cover flex-shrink-0"
+                                    style={{ border: "1px solid var(--border)" }}
+                                    title={`${assignedStyle.template_name} — reference only`}
+                                  />
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1092,60 +1120,6 @@ export default function VideoAutomation() {
               </div>
 
             </div>
-
-            {/* Per-template Creatomate style pickers — one mandatory style per selected template */}
-            {creatomateTemplates.length > 0 && selectedTemplateNames.length > 0 && (
-              <div className="mt-6 flex flex-col gap-5">
-                {selectedTemplateNames.map(tKey => {
-                  const assignedId = mtCreatomateStyles[tKey];
-                  return (
-                    <div key={tKey}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <p className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: "var(--muted)" }}>
-                          Template Style — {tKey}
-                        </p>
-                        {!assignedId && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: "rgba(239,68,68,0.1)", color: "#EF4444" }}>required</span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-3">
-                        {creatomateTemplates.map(t => {
-                          const isSelected = assignedId === t.template_id;
-                          return (
-                            <button
-                              key={t.template_id}
-                              onClick={() => setMtCreatomateStyles(prev => ({ ...prev, [tKey]: t.template_id }))}
-                              className="rounded-xl overflow-hidden text-left cursor-pointer flex-shrink-0"
-                              style={{
-                                width: 150,
-                                background: "var(--surface)",
-                                border: `1.5px solid ${isSelected ? ACTIVE_COLOR : "var(--border)"}`,
-                                boxShadow: isSelected ? `0 0 16px ${ACTIVE_GLOW}` : "none",
-                                transition: "border-color 0.15s, box-shadow 0.15s",
-                              }}
-                            >
-                              <div className="w-full flex items-center justify-center relative" style={{ aspectRatio: "9 / 16", background: "var(--bg)" }}>
-                                {t.thumbnail_url ? (
-                                  <img src={t.thumbnail_url} alt={t.template_name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <span style={{ color: "var(--muted)", fontSize: 22 }}>🎬</span>
-                                )}
-                                {isSelected && (
-                                  <span className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold" style={{ background: ACTIVE_COLOR, color: "#fff" }}>✓</span>
-                                )}
-                              </div>
-                              <div className="px-3 py-2.5">
-                                <p className="text-[12px] font-bold truncate" style={{ color: "var(--text)" }}>{t.template_name}</p>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
             </>
             )} {/* end step === "idle" */}
           </motion.div>
