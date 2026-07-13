@@ -1120,6 +1120,49 @@ export default function VideoAutomation() {
               </div>
 
             </div>
+
+            {/* Creatomate template gallery — pick which render template this run uses */}
+            {creatomateTemplates.length > 0 && (
+              <div className="mt-6">
+                <p className="text-[11px] font-semibold tracking-widest uppercase mb-3" style={{ color: "var(--muted)" }}>
+                  Template Styles
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {creatomateTemplates.map(t => {
+                    const isSelected = selectedCreatomateId === t.template_id;
+                    return (
+                      <button
+                        key={t.template_id}
+                        onClick={() => setSelectedCreatomateId(isSelected ? null : t.template_id)}
+                        className="rounded-xl overflow-hidden text-left cursor-pointer flex-shrink-0"
+                        style={{
+                          width: 190,
+                          background: "var(--surface)",
+                          border: `1.5px solid ${isSelected ? ACTIVE_COLOR : "var(--border)"}`,
+                          boxShadow: isSelected ? `0 0 16px ${ACTIVE_GLOW}` : "none",
+                          transition: "border-color 0.15s, box-shadow 0.15s",
+                        }}
+                      >
+                        <div className="w-full flex items-center justify-center relative" style={{ aspectRatio: "9 / 16", background: "var(--bg)" }}>
+                          {t.thumbnail_url ? (
+                            <img src={t.thumbnail_url} alt={t.template_name} className="w-full h-full object-cover" />
+                          ) : (
+                            <span style={{ color: "var(--muted)", fontSize: 26 }}>🎬</span>
+                          )}
+                          {isSelected && (
+                            <span className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold" style={{ background: ACTIVE_COLOR, color: "#fff" }}>✓</span>
+                          )}
+                        </div>
+                        <div className="px-3 py-2.5">
+                          <p className="text-[13px] font-bold truncate" style={{ color: "var(--text)" }}>{t.template_name}</p>
+                          <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>Edited {timeAgo(t.updated_at)}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             </>
             )} {/* end step === "idle" */}
           </motion.div>
