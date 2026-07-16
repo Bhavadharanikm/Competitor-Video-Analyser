@@ -109,7 +109,7 @@ function parseTimestampSegments(raw: string): TimestampSegment[] {
     const body = (parts[i + 1] ?? "").trim();
     const [beforePipe, ...rest] = body.split("|");
     const afterPipe = rest.join("|").trim();
-    const overlayMatch = afterPipe.match(/Text overlay:\s*"([^"]*)"/);
+    const overlayMatch = afterPipe.match(/Text overlay(?:\s+reads)?:\s*"([^"]*)"/i);
     const description = overlayMatch ? afterPipe.slice(0, overlayMatch.index).trim() : afterPipe;
     segments.push({
       time,
@@ -1212,18 +1212,25 @@ export default function VideoAutomation() {
               </div>
               <div className="px-8 py-7 flex flex-col gap-6">
                 {(() => {
-                  // Render "Airtable Link" right before "Timestamps", keeping everything else in original order.
+                  // Render Airtable Link, Clip Count, Duration and Target Audience right before
+                  // Timestamps (in that order), keeping everything else in original order.
+                  const promoteOrder = [/airtable/i, /clip count/i, /duration/i, /target audience/i];
                   const timestampIdx = headers.findIndex(h => /timestamp/i.test(h));
-                  const airtableIdx  = headers.findIndex(h => /airtable/i.test(h));
                   let orderedHeaders = headers;
-                  if (timestampIdx !== -1 && airtableIdx !== -1 && airtableIdx !== timestampIdx - 1) {
-                    orderedHeaders = headers.filter((_, i) => i !== airtableIdx);
-                    const newTimestampIdx = orderedHeaders.findIndex(h => /timestamp/i.test(h));
-                    orderedHeaders.splice(newTimestampIdx, 0, headers[airtableIdx]);
+                  if (timestampIdx !== -1) {
+                    const promoted = promoteOrder
+                      .map(re => headers.find(h => re.test(h)))
+                      .filter((h): h is string => !!h);
+                    if (promoted.length > 0) {
+                      const rest = headers.filter(h => !promoted.includes(h));
+                      const newTimestampIdx = rest.findIndex(h => /timestamp/i.test(h));
+                      orderedHeaders = [...rest.slice(0, newTimestampIdx), ...promoted, ...rest.slice(newTimestampIdx)];
+                    }
                   }
                   return orderedHeaders.map(h => {
                     if (!detailRow[h]) return null;
                     const isTimestamps = /timestamp/i.test(h);
+                    const isAirtableLink = /airtable/i.test(h);
                     const segments = isTimestamps ? parseTimestampSegments(detailRow[h]) : [];
                     return (
                       <div key={h}>
@@ -1243,6 +1250,16 @@ export default function VideoAutomation() {
                               </div>
                             ))}
                           </div>
+                        ) : isAirtableLink ? (
+                          <a
+                            href={detailRow[h].trim()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[13px] leading-relaxed break-all"
+                            style={{ color: ACTIVE_COLOR, textDecoration: "underline" }}
+                          >
+                            {detailRow[h]}
+                          </a>
                         ) : (
                           <p className="text-[13px] leading-relaxed" style={{ color: "var(--text)" }}>{detailRow[h]}</p>
                         )}
