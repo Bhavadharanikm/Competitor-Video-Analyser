@@ -1215,6 +1215,7 @@ export default function VideoAutomation() {
                   if (!detailRow[h]) return null;
                   const isTimestamps = /timestamp/i.test(h);
                   const segments = isTimestamps ? parseTimestampSegments(detailRow[h]) : [];
+                  const isUrl = /^https?:\/\//i.test(detailRow[h].trim());
                   return (
                     <div key={h}>
                       <p className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--muted)", fontFamily: "JetBrains Mono, monospace" }}>{h}</p>
@@ -1233,6 +1234,16 @@ export default function VideoAutomation() {
                             </div>
                           ))}
                         </div>
+                      ) : isUrl ? (
+                        <a
+                          href={detailRow[h].trim()}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[13px] leading-relaxed break-all"
+                          style={{ color: ACTIVE_COLOR, textDecoration: "underline" }}
+                        >
+                          {detailRow[h]}
+                        </a>
                       ) : (
                         <p className="text-[13px] leading-relaxed" style={{ color: "var(--text)" }}>{detailRow[h]}</p>
                       )}
