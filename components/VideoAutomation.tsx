@@ -93,6 +93,34 @@ function initials(name: string) {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
+interface TimestampSegment {
+  time: string;
+  tags: string;
+  description: string;
+  overlay: string | null;
+}
+
+function parseTimestampSegments(raw: string): TimestampSegment[] {
+  const parts = raw.split(/\[(\d+:\d+\s*-\s*\d+:\d+)\]/);
+  const segments: TimestampSegment[] = [];
+  // parts alternates: [prefix, time1, body1, time2, body2, ...]
+  for (let i = 1; i < parts.length; i += 2) {
+    const time = parts[i].trim();
+    const body = (parts[i + 1] ?? "").trim();
+    const [beforePipe, ...rest] = body.split("|");
+    const afterPipe = rest.join("|").trim();
+    const overlayMatch = afterPipe.match(/Text overlay:\s*"([^"]*)"/);
+    const description = overlayMatch ? afterPipe.slice(0, overlayMatch.index).trim() : afterPipe;
+    segments.push({
+      time,
+      tags: beforePipe.trim(),
+      description,
+      overlay: overlayMatch ? overlayMatch[1] : null,
+    });
+  }
+  return segments;
+}
+
 interface CreatomateTemplate {
   template_id:        string;
   template_name:      string;
@@ -1174,21 +1202,43 @@ export default function VideoAutomation() {
       <AnimatePresence>
         {detailRow && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)" }} onClick={() => setDetailRow(null)}>
-            <motion.div initial={{ scale: 0.92, opacity: 0, y: 16 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.92, opacity: 0, y: 8 }} transition={{ type: "spring", stiffness: 380, damping: 32 }} className="w-full max-w-lg rounded-3xl overflow-hidden" style={{ background: "var(--surface)", border: `1px solid ${CARD_BORDER}`, maxHeight: "80vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between px-7 py-5 sticky top-0" style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
+            <motion.div initial={{ scale: 0.92, opacity: 0, y: 16 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.92, opacity: 0, y: 8 }} transition={{ type: "spring", stiffness: 380, damping: 32 }} className="w-full max-w-3xl rounded-3xl overflow-hidden" style={{ background: "var(--surface)", border: `1px solid ${CARD_BORDER}`, maxHeight: "88vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-8 py-6 sticky top-0" style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
                 <div>
-                  <p className="text-[11px] font-semibold tracking-widest uppercase mb-0.5" style={{ color: "var(--muted)" }}>Template Details</p>
-                  <p className="text-[15px] font-bold" style={{ color: "var(--text)" }}>{detailRow[fileKey]}</p>
+                  <p className="text-[12px] font-bold tracking-widest uppercase mb-1" style={{ color: "var(--muted)" }}>Template Details</p>
+                  <p className="text-[19px] font-bold" style={{ color: "var(--text)" }}>{detailRow[fileKey]}</p>
                 </div>
-                <button onClick={() => setDetailRow(null)} className="w-8 h-8 rounded-full flex items-center justify-center text-[16px] cursor-pointer" style={{ background: "var(--bg)", color: "var(--muted)" }}>✕</button>
+                <button onClick={() => setDetailRow(null)} className="w-9 h-9 rounded-full flex items-center justify-center text-[18px] cursor-pointer flex-shrink-0" style={{ background: "var(--bg)", color: "var(--muted)" }}>✕</button>
               </div>
-              <div className="px-7 py-6 flex flex-col gap-4">
-                {headers.map(h => detailRow[h] ? (
-                  <div key={h}>
-                    <p className="text-[10px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--muted)", fontFamily: "JetBrains Mono, monospace" }}>{h}</p>
-                    <p className="text-[13px] leading-relaxed" style={{ color: "var(--text)" }}>{detailRow[h]}</p>
-                  </div>
-                ) : null)}
+              <div className="px-8 py-7 flex flex-col gap-6">
+                {headers.map(h => {
+                  if (!detailRow[h]) return null;
+                  const isTimestamps = /timestamp/i.test(h);
+                  const segments = isTimestamps ? parseTimestampSegments(detailRow[h]) : [];
+                  return (
+                    <div key={h}>
+                      <p className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--muted)", fontFamily: "JetBrains Mono, monospace" }}>{h}</p>
+                      {isTimestamps && segments.length > 0 ? (
+                        <div className="flex flex-col gap-3">
+                          {segments.map((seg, i) => (
+                            <div key={i} className="rounded-xl px-4 py-3" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                <span className="text-[12px] font-bold px-2 py-0.5 rounded-md" style={{ background: "rgba(37,99,235,0.12)", color: ACTIVE_COLOR, fontFamily: "JetBrains Mono, monospace" }}>{seg.time}</span>
+                                {seg.tags && <span className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{seg.tags}</span>}
+                              </div>
+                              <p className="text-[13px] leading-relaxed" style={{ color: "var(--text)" }}>{seg.description}</p>
+                              {seg.overlay && (
+                                <p className="text-[13px] italic mt-1.5" style={{ color: "var(--muted)" }}>Text overlay: <span style={{ color: "var(--text)" }}>&ldquo;{seg.overlay}&rdquo;</span></p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[13px] leading-relaxed" style={{ color: "var(--text)" }}>{detailRow[h]}</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </motion.div>
           </motion.div>
