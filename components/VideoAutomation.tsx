@@ -1211,45 +1211,45 @@ export default function VideoAutomation() {
                 <button onClick={() => setDetailRow(null)} className="w-9 h-9 rounded-full flex items-center justify-center text-[18px] cursor-pointer flex-shrink-0" style={{ background: "var(--bg)", color: "var(--muted)" }}>✕</button>
               </div>
               <div className="px-8 py-7 flex flex-col gap-6">
-                {headers.map(h => {
-                  if (!detailRow[h]) return null;
-                  const isTimestamps = /timestamp/i.test(h);
-                  const segments = isTimestamps ? parseTimestampSegments(detailRow[h]) : [];
-                  const isUrl = /^https?:\/\//i.test(detailRow[h].trim());
-                  return (
-                    <div key={h}>
-                      <p className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--muted)", fontFamily: "JetBrains Mono, monospace" }}>{h}</p>
-                      {isTimestamps && segments.length > 0 ? (
-                        <div className="flex flex-col gap-3">
-                          {segments.map((seg, i) => (
-                            <div key={i} className="rounded-xl px-4 py-3" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
-                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                <span className="text-[12px] font-bold px-2 py-0.5 rounded-md" style={{ background: "rgba(37,99,235,0.12)", color: ACTIVE_COLOR, fontFamily: "JetBrains Mono, monospace" }}>{seg.time}</span>
-                                {seg.tags && <span className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{seg.tags}</span>}
+                {(() => {
+                  // Render "Airtable Link" right before "Timestamps", keeping everything else in original order.
+                  const timestampIdx = headers.findIndex(h => /timestamp/i.test(h));
+                  const airtableIdx  = headers.findIndex(h => /airtable/i.test(h));
+                  let orderedHeaders = headers;
+                  if (timestampIdx !== -1 && airtableIdx !== -1 && airtableIdx !== timestampIdx - 1) {
+                    orderedHeaders = headers.filter((_, i) => i !== airtableIdx);
+                    const newTimestampIdx = orderedHeaders.findIndex(h => /timestamp/i.test(h));
+                    orderedHeaders.splice(newTimestampIdx, 0, headers[airtableIdx]);
+                  }
+                  return orderedHeaders.map(h => {
+                    if (!detailRow[h]) return null;
+                    const isTimestamps = /timestamp/i.test(h);
+                    const segments = isTimestamps ? parseTimestampSegments(detailRow[h]) : [];
+                    return (
+                      <div key={h}>
+                        <p className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--muted)", fontFamily: "JetBrains Mono, monospace" }}>{h}</p>
+                        {isTimestamps && segments.length > 0 ? (
+                          <div className="flex flex-col gap-3">
+                            {segments.map((seg, i) => (
+                              <div key={i} className="rounded-xl px-4 py-3" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+                                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                  <span className="text-[12px] font-bold px-2 py-0.5 rounded-md" style={{ background: "rgba(37,99,235,0.12)", color: ACTIVE_COLOR, fontFamily: "JetBrains Mono, monospace" }}>{seg.time}</span>
+                                  {seg.tags && <span className="text-[12px] font-bold" style={{ color: "var(--text)" }}>{seg.tags}</span>}
+                                </div>
+                                <p className="text-[13px] leading-relaxed" style={{ color: "var(--text)" }}>{seg.description}</p>
+                                {seg.overlay && (
+                                  <p className="text-[13px] italic mt-1.5" style={{ color: "var(--muted)" }}>Text overlay: <span style={{ color: "var(--text)" }}>&ldquo;{seg.overlay}&rdquo;</span></p>
+                                )}
                               </div>
-                              <p className="text-[13px] leading-relaxed" style={{ color: "var(--text)" }}>{seg.description}</p>
-                              {seg.overlay && (
-                                <p className="text-[13px] italic mt-1.5" style={{ color: "var(--muted)" }}>Text overlay: <span style={{ color: "var(--text)" }}>&ldquo;{seg.overlay}&rdquo;</span></p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : isUrl ? (
-                        <a
-                          href={detailRow[h].trim()}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[13px] leading-relaxed break-all"
-                          style={{ color: ACTIVE_COLOR, textDecoration: "underline" }}
-                        >
-                          {detailRow[h]}
-                        </a>
-                      ) : (
-                        <p className="text-[13px] leading-relaxed" style={{ color: "var(--text)" }}>{detailRow[h]}</p>
-                      )}
-                    </div>
-                  );
-                })}
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[13px] leading-relaxed" style={{ color: "var(--text)" }}>{detailRow[h]}</p>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </motion.div>
           </motion.div>
