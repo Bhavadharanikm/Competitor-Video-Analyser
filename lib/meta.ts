@@ -40,7 +40,13 @@ async function graphFetch(path: string, params: Record<string, string>, method: 
     : `${GRAPH}${path}`;
   const res = await fetch(url, method === "GET" ? undefined : { method: "POST", body: new URLSearchParams(params) });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.message ?? `Meta API error at ${path}`);
+  if (!res.ok) {
+    const err = data.error ?? {};
+    const detail = [err.message, err.error_subcode && `subcode=${err.error_subcode}`, err.fbtrace_id && `trace=${err.fbtrace_id}`]
+      .filter(Boolean)
+      .join(" | ");
+    throw new Error(detail || `Meta API error at ${path}`);
+  }
   return data;
 }
 
@@ -113,8 +119,13 @@ export async function publishToFacebook(entry: CalendarEntry): Promise<string> {
     params.published = "true";
   }
 
-  const data = await graphFetch(path, params);
-  return data.id as string;
+  try {
+    const data = await graphFetch(path, params);
+    return data.id as string;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(params.file_url ? `${msg} [file_url=${params.file_url}]` : msg);
+  }
 }
 
 /**
