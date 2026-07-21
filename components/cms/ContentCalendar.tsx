@@ -47,10 +47,59 @@ function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 
 function daysInMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); }
 // Monday-first weekday index (0=Mon .. 6=Sun)
 function mondayIndex(d: Date) { return (d.getDay() + 6) % 7; }
+function startOfWeek(d: Date) { const r = new Date(d); r.setDate(r.getDate() - mondayIndex(r)); r.setHours(0, 0, 0, 0); return r; }
+function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
 
 const CLIENT_STORAGE_KEY = "cms_selected_client";
+const VIEW_STORAGE_KEY = "cms_calendar_view";
+
+let iconIdCounter = 0;
+
+/** Colorful little brand badges — Meta doesn't give us real logos to embed, so these are hand-drawn SVGs. */
+function FacebookIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className="flex-shrink-0">
+      <circle cx="12" cy="12" r="12" fill="#1877F2" />
+      <path d="M15.5 8.5h-1.7c-.4 0-.8.4-.8.9V11h2.4l-.3 2.4h-2.1V19h-2.4v-5.6H8.7V11h1.9V9.1c0-1.9 1.1-3 3-3h2v2.4Z" fill="#fff" />
+    </svg>
+  );
+}
+
+function InstagramIcon({ size = 16 }: { size?: number }) {
+  const [gid] = useState(() => `ig-grad-${iconIdCounter++}`);
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className="flex-shrink-0">
+      <defs>
+        <radialGradient id={gid} cx="30%" cy="107%" r="150%">
+          <stop offset="0%" stopColor="#fdf497" />
+          <stop offset="20%" stopColor="#fdf497" />
+          <stop offset="45%" stopColor="#fd5949" />
+          <stop offset="65%" stopColor="#d6249f" />
+          <stop offset="100%" stopColor="#285AEB" />
+        </radialGradient>
+      </defs>
+      <circle cx="12" cy="12" r="12" fill={`url(#${gid})`} />
+      <rect x="7.2" y="7.2" width="9.6" height="9.6" rx="3" fill="none" stroke="#fff" strokeWidth="1.3" />
+      <circle cx="12" cy="12" r="2.6" fill="none" stroke="#fff" strokeWidth="1.3" />
+      <circle cx="15.2" cy="8.8" r="0.6" fill="#fff" />
+    </svg>
+  );
+}
+
+function PlatformIcons({ platform, size = 16 }: { platform: string; size?: number }) {
+  return (
+    <span className="flex items-center -space-x-1.5 flex-shrink-0">
+      {(platform === "both" || platform === "facebook") && <FacebookIcon size={size} />}
+      {(platform === "both" || platform === "instagram") && <InstagramIcon size={size} />}
+    </span>
+  );
+}
 
 export default function ContentCalendar() {
+  const [view, setView] = useState<"month" | "week">(() => {
+    if (typeof window === "undefined") return "month";
+    return (localStorage.getItem(VIEW_STORAGE_KEY) as "month" | "week") ?? "month";
+  });
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -59,11 +108,24 @@ export default function ContentCalendar() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [addDate, setAddDate] = useState<string | null>(null);
+  const [addHour, setAddHour] = useState<number | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<CalendarEntry | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
 
   const sortedClients = useMemo(() => [...clients].sort((a, b) => a.name.localeCompare(b.name)), [clients]);
 
+  const changeView = (v: "month" | "week") => {
+    setView(v);
+    if (typeof window !== "undefined") localStorage.setItem(VIEW_STORAGE_KEY, v);
+  };
+
   const monthLabel = cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const weekStart = useMemo(() => startOfWeek(cursor), [cursor]);
+  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
+  const weekLabel = weekStart.getMonth() === weekEnd.getMonth()
+    ? `${weekStart.toLocaleDateString("en-US", { month: "long", day: "numeric" })} – ${weekEnd.getDate()}, ${weekEnd.getFullYear()}`
+    : `${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${weekEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${weekEnd.getFullYear()}`;
 
   const grid = useMemo(() => {
     const first = startOfMonth(cursor);
@@ -88,11 +150,16 @@ export default function ContentCalendar() {
     return cells;
   }, [cursor]);
 
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+
+  const rangeStart = view === "week" ? weekStart : grid[0].date;
+  const rangeEnd = view === "week" ? addDays(weekEnd, 1) : grid[grid.length - 1].date;
+
   const fetchEntries = () => {
     if (!selectedClientPageId) { setEntries([]); return; }
     setLoading(true);
-    const from = grid[0].date.toISOString();
-    const to = grid[grid.length - 1].date.toISOString();
+    const from = rangeStart.toISOString();
+    const to = rangeEnd.toISOString();
     fetch(`/api/cms/calendar?from=${from}&to=${to}&client_page_id=${selectedClientPageId}`)
       .then(r => r.json())
       .then(data => setEntries(data.entries ?? []))
@@ -100,7 +167,7 @@ export default function ContentCalendar() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchEntries(); }, [cursor, selectedClientPageId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchEntries(); }, [cursor, view, selectedClientPageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchClients = (preserveSelection: boolean) => {
     setClientsLoading(true);
@@ -160,6 +227,39 @@ export default function ContentCalendar() {
 
   const dateKey = (d: Date) => d.toISOString().slice(0, 10);
 
+  const volumeByDay = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const e of entries) {
+      const key = e.scheduled_at.slice(0, 10);
+      map[key] = (map[key] ?? 0) + 1;
+    }
+    return map;
+  }, [entries]);
+  const maxVolume = Math.max(1, ...Object.values(volumeByDay));
+
+  // Drag-and-drop reschedule: keeps the entry's original time-of-day unless an explicit hour is given (week view drop).
+  const moveEntry = async (entryId: string, targetDate: Date, targetHour?: number) => {
+    const entry = entries.find(e => e.id === entryId);
+    if (!entry) return;
+    const original = new Date(entry.scheduled_at);
+    const next = new Date(targetDate);
+    next.setHours(targetHour ?? original.getHours(), targetHour != null ? 0 : original.getMinutes(), 0, 0);
+    if (next.getTime() === original.getTime()) return;
+    setEntries(prev => prev.map(e => e.id === entryId ? { ...e, scheduled_at: next.toISOString() } : e));
+    setMoveError(null);
+    try {
+      const res = await fetch(`/api/cms/calendar?id=${entryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduled_at: next.toISOString() }),
+      });
+      if (!res.ok) throw new Error((await res.text()) || "Failed to reschedule");
+    } catch (err) {
+      setEntries(prev => prev.map(e => e.id === entryId ? { ...e, scheduled_at: entry.scheduled_at } : e));
+      setMoveError(err instanceof Error ? err.message : "Failed to reschedule");
+    }
+  };
+
   return (
     <div className="rounded-3xl overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
       {/* Client selector */}
@@ -189,27 +289,38 @@ export default function ContentCalendar() {
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: "1px solid var(--border)" }}>
+      <div className="flex items-center justify-between px-6 py-5 flex-wrap gap-3" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setCursor(c => new Date(c.getFullYear(), c.getMonth() - 1, 1))}
+            onClick={() => setCursor(c => view === "month" ? new Date(c.getFullYear(), c.getMonth() - 1, 1) : addDays(c, -7))}
             className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
             style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" }}
           >←</button>
-          <h2 className="text-[20px] font-bold" style={{ color: "var(--text)" }}>{monthLabel}</h2>
+          <h2 className="text-[20px] font-bold whitespace-nowrap" style={{ color: "var(--text)" }}>{view === "month" ? monthLabel : weekLabel}</h2>
           <button
-            onClick={() => setCursor(c => new Date(c.getFullYear(), c.getMonth() + 1, 1))}
+            onClick={() => setCursor(c => view === "month" ? new Date(c.getFullYear(), c.getMonth() + 1, 1) : addDays(c, 7))}
             className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
             style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" }}
           >→</button>
           <button
-            onClick={() => setCursor(startOfMonth(new Date()))}
+            onClick={() => setCursor(view === "month" ? startOfMonth(new Date()) : new Date())}
             className="px-3 py-1.5 rounded-[8px] text-[12px] font-semibold cursor-pointer"
             style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--muted)" }}
           >Today</button>
+
+          <div className="flex items-center rounded-[9px] p-1 ml-1" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+            {(["month", "week"] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => changeView(v)}
+                className="px-3 py-1 rounded-[7px] text-[12px] font-semibold cursor-pointer capitalize"
+                style={v === view ? { background: ACTIVE_COLOR, color: "#fff" } : { background: "none", color: "var(--muted)" }}
+              >{v}</button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           {Object.entries(STATUS_STYLES).map(([key, s]) => (
             <div key={key} className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--muted)" }}>
               <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />
@@ -217,61 +328,120 @@ export default function ContentCalendar() {
             </div>
           ))}
           <button
-            onClick={() => { setAddDate(dateKey(new Date())); setShowAdd(true); }}
+            onClick={() => { setAddDate(dateKey(new Date())); setAddHour(null); setShowAdd(true); }}
             className="px-4 py-2 rounded-[10px] text-[12px] font-bold cursor-pointer"
             style={{ background: ACTIVE_COLOR, color: "#fff", boxShadow: `0 0 14px ${ACTIVE_GLOW}`, border: "none" }}
           >+ Add Entry</button>
         </div>
       </div>
 
-      {/* Weekday row */}
-      <div className="grid grid-cols-7" style={{ borderBottom: "1px solid var(--border)" }}>
-        {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(d => (
-          <div key={d} className="px-4 py-2.5 text-[11px] font-semibold tracking-widest" style={{ color: "var(--muted)" }}>{d}</div>
-        ))}
-      </div>
+      {moveError && (
+        <div className="px-6 py-2 text-[12px]" style={{ background: "rgba(239,68,68,0.1)", color: "#EF4444" }}>{moveError}</div>
+      )}
 
-      {/* Grid */}
-      <div className="grid grid-cols-7">
-        {grid.map(({ date, inMonth }, i) => {
+      {/* Post volume strip — "content peaking" view showing how many posts land on each day */}
+      <div className="flex items-end gap-1 px-6 pt-4 pb-2" style={{ borderBottom: "1px solid var(--border)", background: "var(--bg)" }}>
+        {(view === "week" ? weekDays : grid.filter(c => c.inMonth).map(c => c.date)).map((date, i) => {
           const key = dateKey(date);
-          const dayEntries = entriesByDay[key] ?? [];
+          const vol = volumeByDay[key] ?? 0;
+          const heightPx = 4 + Math.round((vol / maxVolume) * 28);
           return (
-            <div
-              key={i}
-              className="min-h-[120px] px-3 py-2.5 flex flex-col gap-1.5 group cursor-pointer"
-              style={{
-                borderRight: (i + 1) % 7 !== 0 ? "1px solid var(--border)" : "none",
-                borderBottom: "1px solid var(--border)",
-                opacity: inMonth ? 1 : 0.35,
-              }}
-              onClick={() => { setAddDate(key); setShowAdd(true); }}
-            >
-              <span
-                className="text-[13px] font-semibold w-6 h-6 rounded-full flex items-center justify-center"
-                style={key === dateKey(new Date()) ? { background: "var(--text)", color: "var(--surface)" } : { color: "var(--text)" }}
-              >
-                {date.getDate()}
-              </span>
-              {dayEntries.map(e => {
-                const s = STATUS_STYLES[e.status] ?? STATUS_STYLES.draft;
-                return (
-                  <div
-                    key={e.id}
-                    onClick={ev => { ev.stopPropagation(); setSelectedEntry(e); }}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-[6px] text-[11px] font-semibold truncate cursor-pointer"
-                    style={{ background: s.bg, color: "#fff" }}
-                    title={e.title}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#fff" }} />
-                    <span className="truncate">{e.title}</span>
-                  </div>
-                );
-              })}
+            <div key={i} className="flex-1 flex flex-col items-center gap-1" title={`${vol} post${vol === 1 ? "" : "s"}`}>
+              <div
+                className="w-full rounded-t-[3px] transition-all"
+                style={{ height: heightPx, background: vol > 0 ? ACTIVE_COLOR : "var(--border)", opacity: vol > 0 ? 1 : 0.5, maxWidth: 28 }}
+              />
+              <span className="text-[9px] font-semibold" style={{ color: "var(--muted)" }}>{date.getDate()}</span>
             </div>
           );
         })}
       </div>
+
+      {view === "month" ? (
+        <>
+          {/* Weekday row */}
+          <div className="grid grid-cols-7" style={{ borderBottom: "1px solid var(--border)" }}>
+            {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(d => (
+              <div key={d} className="px-4 py-2.5 text-[11px] font-semibold tracking-widest" style={{ color: "var(--muted)" }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Grid */}
+          <div className="grid grid-cols-7">
+            {grid.map(({ date, inMonth }, i) => {
+              const key = dateKey(date);
+              const dayEntries = entriesByDay[key] ?? [];
+              const isDragOver = dragOverKey === key;
+              return (
+                <div
+                  key={i}
+                  className="min-h-[120px] px-3 py-2.5 flex flex-col gap-1.5 group cursor-pointer"
+                  style={{
+                    borderRight: (i + 1) % 7 !== 0 ? "1px solid var(--border)" : "none",
+                    borderBottom: "1px solid var(--border)",
+                    opacity: inMonth ? 1 : 0.35,
+                    background: isDragOver ? ACTIVE_GLOW : "transparent",
+                  }}
+                  onClick={() => { setAddDate(key); setAddHour(null); setShowAdd(true); }}
+                  onDragOver={ev => { ev.preventDefault(); setDragOverKey(key); }}
+                  onDragLeave={() => setDragOverKey(k => k === key ? null : k)}
+                  onDrop={ev => {
+                    ev.preventDefault();
+                    setDragOverKey(null);
+                    const id = ev.dataTransfer.getData("text/plain");
+                    if (id) moveEntry(id, date);
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="text-[13px] font-semibold w-6 h-6 rounded-full flex items-center justify-center"
+                      style={key === dateKey(new Date()) ? { background: "var(--text)", color: "var(--surface)" } : { color: "var(--text)" }}
+                    >
+                      {date.getDate()}
+                    </span>
+                    {dayEntries.length > 0 && (
+                      <span className="text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center" style={{ background: ACTIVE_COLOR, color: "#fff" }}>
+                        {dayEntries.length}
+                      </span>
+                    )}
+                  </div>
+                  {dayEntries.map(e => {
+                    const s = STATUS_STYLES[e.status] ?? STATUS_STYLES.draft;
+                    return (
+                      <div
+                        key={e.id}
+                        draggable
+                        onDragStart={ev => ev.dataTransfer.setData("text/plain", e.id)}
+                        onClick={ev => { ev.stopPropagation(); setSelectedEntry(e); }}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-[6px] text-[11px] font-semibold truncate cursor-grab active:cursor-grabbing"
+                        style={{ background: s.bg, color: "#fff" }}
+                        title={e.title}
+                      >
+                        <PlatformIcons platform={e.platform} size={13} />
+                        <span className="truncate">{e.title}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <WeekView
+          weekDays={weekDays}
+          entries={entries}
+          dragOverKey={dragOverKey}
+          setDragOverKey={setDragOverKey}
+          onDrop={(id, date, hour) => moveEntry(id, date, hour)}
+          onSelect={setSelectedEntry}
+          onAddAt={(date, hour) => {
+            setAddDate(dateKey(date));
+            setShowAdd(true);
+            setAddHour(hour);
+          }}
+        />
+      )}
 
       {loading && (
         <div className="px-6 py-3 text-[11px]" style={{ color: "var(--muted)" }}>Loading…</div>
@@ -280,6 +450,7 @@ export default function ContentCalendar() {
       {showAdd && addDate && (
         <AddEntryModal
           date={addDate}
+          defaultTime={addHour != null ? `${String(addHour).padStart(2, "0")}:00` : "09:00"}
           clients={sortedClients}
           defaultClientPageId={selectedClientPageId}
           onClose={() => setShowAdd(false)}
@@ -294,6 +465,108 @@ export default function ContentCalendar() {
           onChanged={() => { setSelectedEntry(null); fetchEntries(); }}
         />
       )}
+    </div>
+  );
+}
+
+function WeekView({ weekDays, entries, dragOverKey, setDragOverKey, onDrop, onSelect, onAddAt }: {
+  weekDays: Date[];
+  entries: CalendarEntry[];
+  dragOverKey: string | null;
+  setDragOverKey: (updater: string | null | ((k: string | null) => string | null)) => void;
+  onDrop: (id: string, date: Date, hour: number) => void;
+  onSelect: (entry: CalendarEntry) => void;
+  onAddAt: (date: Date, hour: number) => void;
+}) {
+  const HOURS = Array.from({ length: 18 }, (_, i) => i + 6); // 6 AM .. 11 PM
+  const dateKey = (d: Date) => d.toISOString().slice(0, 10);
+  const today = dateKey(new Date());
+
+  const entriesBySlot = useMemo(() => {
+    const map: Record<string, CalendarEntry[]> = {};
+    for (const e of entries) {
+      const d = new Date(e.scheduled_at);
+      const key = `${dateKey(d)}-${d.getHours()}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(e);
+    }
+    return map;
+  }, [entries]);
+
+  const formatHour = (h: number) => {
+    const period = h < 12 ? "AM" : "PM";
+    const hour12 = h % 12 === 0 ? 12 : h % 12;
+    return `${hour12} ${period}`;
+  };
+
+  return (
+    <div className="flex overflow-auto" style={{ maxHeight: 640 }}>
+      <div className="flex-shrink-0 w-16" style={{ borderRight: "1px solid var(--border)" }}>
+        <div className="h-11 sticky top-0 z-10" style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }} />
+        {HOURS.map(h => (
+          <div key={h} className="h-16 px-2 pt-1 text-[10px] font-semibold text-right" style={{ color: "var(--muted)" }}>
+            {formatHour(h)}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 flex-1 min-w-[700px]">
+        {weekDays.map((date, di) => {
+          const key = dateKey(date);
+          const isToday = key === today;
+          return (
+            <div key={di} style={{ borderRight: di < 6 ? "1px solid var(--border)" : "none" }}>
+              <div
+                className="h-11 flex flex-col items-center justify-center sticky top-0 z-10"
+                style={{ borderBottom: "1px solid var(--border)", background: isToday ? "var(--bg)" : "var(--surface)" }}
+              >
+                <span className="text-[10px] font-semibold tracking-widest" style={{ color: "var(--muted)" }}>
+                  {date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()}
+                </span>
+                <span className="text-[13px] font-bold" style={isToday ? { color: ACTIVE_COLOR } : { color: "var(--text)" }}>{date.getDate()}</span>
+              </div>
+              {HOURS.map(h => {
+                const slotKey = `${key}-${h}`;
+                const slotEntries = entriesBySlot[slotKey] ?? [];
+                const isDragOver = dragOverKey === slotKey;
+                return (
+                  <div
+                    key={h}
+                    className="h-16 px-1 py-1 flex flex-col gap-1 cursor-pointer"
+                    style={{ borderBottom: "1px solid var(--border)", background: isDragOver ? ACTIVE_GLOW : "transparent" }}
+                    onClick={() => onAddAt(date, h)}
+                    onDragOver={ev => { ev.preventDefault(); setDragOverKey(slotKey); }}
+                    onDragLeave={() => setDragOverKey(k => k === slotKey ? null : k)}
+                    onDrop={ev => {
+                      ev.preventDefault();
+                      setDragOverKey(null);
+                      const id = ev.dataTransfer.getData("text/plain");
+                      if (id) onDrop(id, date, h);
+                    }}
+                  >
+                    {slotEntries.map(e => {
+                      const s = STATUS_STYLES[e.status] ?? STATUS_STYLES.draft;
+                      return (
+                        <div
+                          key={e.id}
+                          draggable
+                          onDragStart={ev => ev.dataTransfer.setData("text/plain", e.id)}
+                          onClick={ev => { ev.stopPropagation(); onSelect(e); }}
+                          className="flex items-center gap-1 px-1.5 py-1 rounded-[5px] text-[10px] font-semibold truncate cursor-grab active:cursor-grabbing"
+                          style={{ background: s.bg, color: "#fff" }}
+                          title={e.title}
+                        >
+                          <PlatformIcons platform={e.platform} size={11} />
+                          <span className="truncate">{e.title}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -534,8 +807,9 @@ function EntryDetailModal({ entry, onClose, onChanged }: {
   );
 }
 
-function AddEntryModal({ date, clients, defaultClientPageId, onClose, onCreated }: {
+function AddEntryModal({ date, defaultTime, clients, defaultClientPageId, onClose, onCreated }: {
   date: string;
+  defaultTime?: string;
   clients: Client[];
   defaultClientPageId: string;
   onClose: () => void;
@@ -548,7 +822,7 @@ function AddEntryModal({ date, clients, defaultClientPageId, onClose, onCreated 
   const [platform, setPlatform] = useState("both");
   const [contentType, setContentType] = useState("feed_post");
   const [status, setStatus] = useState("draft");
-  const [time, setTime] = useState("09:00");
+  const [time, setTime] = useState(defaultTime ?? "09:00");
   const [linkUrl, setLinkUrl] = useState("");
   const [customThumbnailUrl, setCustomThumbnailUrl] = useState("");
   const [thumbOffsetSeconds, setThumbOffsetSeconds] = useState("");
