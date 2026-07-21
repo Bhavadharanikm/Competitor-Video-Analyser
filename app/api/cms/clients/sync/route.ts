@@ -30,7 +30,7 @@ export async function POST() {
 
     const clients: { page_id: string; name: string; instagram_account_id: string | null }[] = [];
     let url: string | null =
-      `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,instagram_business_account&limit=100&access_token=${token}`;
+      `https://graph.facebook.com/v23.0/me/accounts?fields=id,name,instagram_business_account&limit=100&access_token=${token}`;
 
     while (url) {
       const res: Response = await fetch(url);

@@ -1,6 +1,6 @@
 import { extractDriveFileId, getDriveFileMeta } from "./googleDrive";
 
-const GRAPH = "https://graph.facebook.com/v19.0";
+const GRAPH = "https://graph.facebook.com/v23.0";
 
 export interface CalendarEntry {
   id: string;
