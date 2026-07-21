@@ -261,7 +261,7 @@ export default function ContentCalendar() {
   };
 
   return (
-    <div className="rounded-3xl overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+    <div className="relative z-[1] rounded-3xl overflow-hidden" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
       {/* Client selector */}
       <div className="flex items-center gap-3 px-6 py-4" style={{ borderBottom: "1px solid var(--border)", background: "var(--bg)" }}>
         <span className="text-[11px] font-semibold tracking-widest uppercase flex-shrink-0" style={{ color: "var(--muted)" }}>Client</span>
@@ -379,7 +379,7 @@ export default function ContentCalendar() {
                   style={{
                     borderRight: (i + 1) % 7 !== 0 ? "1px solid var(--border)" : "none",
                     borderBottom: "1px solid var(--border)",
-                    background: isDragOver ? ACTIVE_GLOW : (inMonth ? "var(--surface)" : "var(--bg)"),
+                    background: isDragOver ? ACTIVE_GLOW : (inMonth ? "var(--bg)" : "var(--surface)"),
                   }}
                   onClick={() => { setAddDate(key); setAddHour(null); setShowAdd(true); }}
                   onDragOver={ev => { ev.preventDefault(); setDragOverKey(key); }}
