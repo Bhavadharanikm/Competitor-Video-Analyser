@@ -1,0 +1,20 @@
+name: CMS publish-due cron
+
+# Free replacement for Vercel Cron (Hobby plan only allows once-daily schedules).
+# Fires every 10 minutes and hits our own /api/cms/cron/publish-due endpoint, which
+# catches any Instagram posts whose scheduled time has arrived (Instagram has no
+# native scheduling) and retries any Facebook submissions that failed earlier.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit publish-due endpoint
+        run: |
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://competitor-video-analyser.vercel.app/api/cms/cron/publish-due"
