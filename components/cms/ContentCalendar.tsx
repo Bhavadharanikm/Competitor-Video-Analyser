@@ -379,8 +379,7 @@ export default function ContentCalendar() {
                   style={{
                     borderRight: (i + 1) % 7 !== 0 ? "1px solid var(--border)" : "none",
                     borderBottom: "1px solid var(--border)",
-                    opacity: inMonth ? 1 : 0.35,
-                    background: isDragOver ? ACTIVE_GLOW : "transparent",
+                    background: isDragOver ? ACTIVE_GLOW : (inMonth ? "var(--surface)" : "var(--bg)"),
                   }}
                   onClick={() => { setAddDate(key); setAddHour(null); setShowAdd(true); }}
                   onDragOver={ev => { ev.preventDefault(); setDragOverKey(key); }}
@@ -395,7 +394,11 @@ export default function ContentCalendar() {
                   <div className="flex items-center justify-between">
                     <span
                       className="text-[13px] font-semibold w-6 h-6 rounded-full flex items-center justify-center"
-                      style={key === dateKey(new Date()) ? { background: "var(--text)", color: "var(--surface)" } : { color: "var(--text)" }}
+                      style={
+                        key === dateKey(new Date())
+                          ? { background: "var(--text)", color: "var(--surface)" }
+                          : { color: inMonth ? "var(--text)" : "var(--muted)" }
+                      }
                     >
                       {date.getDate()}
                     </span>
