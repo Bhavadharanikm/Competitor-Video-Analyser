@@ -3,6 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 
 const ACTIVE_COLOR = "#2563EB";
 const ACTIVE_GLOW = "rgba(37,99,235,0.25)";
+// Warm beige surfaces used across the calendar card, instead of the app's default stark white.
+const CAL_BG = "#FAF7F1";
+const CAL_ALT_BG = "#F1EBDF";
 
 interface Client {
   page_id: string;
@@ -261,16 +264,16 @@ export default function ContentCalendar() {
   };
 
   return (
-    <div className="relative z-[1] rounded-3xl overflow-hidden" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+    <div className="relative z-[1] rounded-3xl overflow-hidden" style={{ background: CAL_BG, border: "1px solid var(--border)" }}>
       {/* Client selector */}
-      <div className="flex items-center gap-3 px-6 py-4" style={{ borderBottom: "1px solid var(--border)", background: "var(--bg)" }}>
+      <div className="flex items-center gap-3 px-6 py-4" style={{ borderBottom: "1px solid var(--border)", background: CAL_BG }}>
         <span className="text-[11px] font-semibold tracking-widest uppercase flex-shrink-0" style={{ color: "var(--muted)" }}>Client</span>
         <select
           value={selectedClientPageId}
           onChange={e => handleClientChange(e.target.value)}
           disabled={clientsLoading || clients.length === 0}
           className="rounded-[8px] px-3 py-2 text-[13px] font-semibold outline-none cursor-pointer disabled:opacity-50"
-          style={{ background: "var(--surface)", border: `1.5px solid ${ACTIVE_COLOR}`, color: "var(--text)", minWidth: 220 }}
+          style={{ background: CAL_ALT_BG, border: `1.5px solid ${ACTIVE_COLOR}`, color: "var(--text)", minWidth: 220 }}
         >
           {clientsLoading && <option>Loading clients…</option>}
           {!clientsLoading && clients.length === 0 && <option value="">No clients synced yet</option>}
@@ -283,7 +286,7 @@ export default function ContentCalendar() {
           onClick={syncClients}
           disabled={syncing}
           className="ml-auto px-3 py-1.5 rounded-[8px] text-[11px] font-semibold cursor-pointer disabled:opacity-50"
-          style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}
+          style={{ background: CAL_ALT_BG, border: "1px solid var(--border)", color: "var(--text)" }}
         >{syncing ? "Syncing…" : "↻ Sync from Meta"}</button>
         {syncError && <span className="text-[11px]" style={{ color: "#EF4444" }}>{syncError}</span>}
       </div>
@@ -294,21 +297,21 @@ export default function ContentCalendar() {
           <button
             onClick={() => setCursor(c => view === "month" ? new Date(c.getFullYear(), c.getMonth() - 1, 1) : addDays(c, -7))}
             className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
-            style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" }}
+            style={{ background: CAL_BG, border: "1px solid var(--border)", color: "var(--text)" }}
           >←</button>
           <h2 className="text-[20px] font-bold whitespace-nowrap" style={{ color: "var(--text)" }}>{view === "month" ? monthLabel : weekLabel}</h2>
           <button
             onClick={() => setCursor(c => view === "month" ? new Date(c.getFullYear(), c.getMonth() + 1, 1) : addDays(c, 7))}
             className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
-            style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" }}
+            style={{ background: CAL_BG, border: "1px solid var(--border)", color: "var(--text)" }}
           >→</button>
           <button
             onClick={() => setCursor(view === "month" ? startOfMonth(new Date()) : new Date())}
             className="px-3 py-1.5 rounded-[8px] text-[12px] font-semibold cursor-pointer"
-            style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--muted)" }}
+            style={{ background: CAL_BG, border: "1px solid var(--border)", color: "var(--muted)" }}
           >Today</button>
 
-          <div className="flex items-center rounded-[9px] p-1 ml-1" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+          <div className="flex items-center rounded-[9px] p-1 ml-1" style={{ background: CAL_BG, border: "1px solid var(--border)" }}>
             {(["month", "week"] as const).map(v => (
               <button
                 key={v}
@@ -340,7 +343,7 @@ export default function ContentCalendar() {
       )}
 
       {/* Post volume strip — "content peaking" view showing how many posts land on each day */}
-      <div className="flex items-end gap-1 px-6 pt-4 pb-2" style={{ borderBottom: "1px solid var(--border)", background: "var(--bg)" }}>
+      <div className="flex items-end gap-1 px-6 pt-4 pb-2" style={{ borderBottom: "1px solid var(--border)", background: CAL_BG }}>
         {(view === "week" ? weekDays : grid.filter(c => c.inMonth).map(c => c.date)).map((date, i) => {
           const key = dateKey(date);
           const vol = volumeByDay[key] ?? 0;
@@ -379,7 +382,7 @@ export default function ContentCalendar() {
                   style={{
                     borderRight: (i + 1) % 7 !== 0 ? "1px solid var(--border)" : "none",
                     borderBottom: "1px solid var(--border)",
-                    background: isDragOver ? ACTIVE_GLOW : (inMonth ? "var(--bg)" : "var(--surface)"),
+                    background: isDragOver ? ACTIVE_GLOW : (inMonth ? CAL_BG : CAL_ALT_BG),
                   }}
                   onClick={() => { setAddDate(key); setAddHour(null); setShowAdd(true); }}
                   onDragOver={ev => { ev.preventDefault(); setDragOverKey(key); }}
@@ -505,7 +508,7 @@ function WeekView({ weekDays, entries, dragOverKey, setDragOverKey, onDrop, onSe
   return (
     <div className="flex overflow-auto" style={{ maxHeight: 640 }}>
       <div className="flex-shrink-0 w-16" style={{ borderRight: "1px solid var(--border)" }}>
-        <div className="h-11 sticky top-0 z-10" style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }} />
+        <div className="h-11 sticky top-0 z-10" style={{ borderBottom: "1px solid var(--border)", background: CAL_ALT_BG }} />
         {HOURS.map(h => (
           <div key={h} className="h-16 px-2 pt-1 text-[10px] font-semibold text-right" style={{ color: "var(--muted)" }}>
             {formatHour(h)}
@@ -520,7 +523,7 @@ function WeekView({ weekDays, entries, dragOverKey, setDragOverKey, onDrop, onSe
             <div key={di} style={{ borderRight: di < 6 ? "1px solid var(--border)" : "none" }}>
               <div
                 className="h-11 flex flex-col items-center justify-center sticky top-0 z-10"
-                style={{ borderBottom: "1px solid var(--border)", background: isToday ? "var(--bg)" : "var(--surface)" }}
+                style={{ borderBottom: "1px solid var(--border)", background: isToday ? CAL_BG : CAL_ALT_BG }}
               >
                 <span className="text-[10px] font-semibold tracking-widest" style={{ color: "var(--muted)" }}>
                   {date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()}
