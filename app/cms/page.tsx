@@ -30,11 +30,11 @@ export default function CmsPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)" }}>
-      <div className="max-w-[1200px] mx-auto px-8 py-10">
+      <div className="max-w-[1760px] mx-auto px-8 py-10">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <p className="text-[11px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--muted)" }}>Content Management System</p>
-            <h1 className="text-[28px] font-bold" style={{ color: "var(--text)" }}>Content Calendar</h1>
+            <p className="text-[12px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--muted)" }}>Content Management System</p>
+            <h1 className="text-[34px] font-bold" style={{ color: "var(--text)" }}>Content Calendar</h1>
           </div>
           <button
             onClick={() => router.push("/")}
