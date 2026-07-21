@@ -23,10 +23,14 @@ function driveAuth() {
   });
 }
 
-export async function getDriveFileMeta(fileId: string): Promise<{ mimeType: string; name: string | null }> {
+export async function getDriveFileMeta(fileId: string): Promise<{ mimeType: string; name: string | null; size: number | null }> {
   const drive = google.drive({ version: "v3", auth: driveAuth() });
-  const res = await drive.files.get({ fileId, fields: "mimeType,name" });
-  return { mimeType: res.data.mimeType ?? "application/octet-stream", name: res.data.name ?? null };
+  const res = await drive.files.get({ fileId, fields: "mimeType,name,size" });
+  return {
+    mimeType: res.data.mimeType ?? "application/octet-stream",
+    name: res.data.name ?? null,
+    size: res.data.size ? Number(res.data.size) : null,
+  };
 }
 
 export async function streamDriveFile(fileId: string) {
