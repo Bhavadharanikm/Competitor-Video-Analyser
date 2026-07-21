@@ -37,10 +37,10 @@ interface CalendarEntry {
 }
 
 const STATUS_STYLES: Record<string, { label: string; color: string; bg: string }> = {
-  draft:      { label: "Draft",     color: "#6B7280", bg: "rgba(107,114,128,0.12)" },
-  in_review:  { label: "In Review", color: "#D97706", bg: "rgba(217,119,6,0.12)" },
-  approved:   { label: "Approved",  color: "#16A34A", bg: "rgba(22,163,74,0.12)" },
-  sent:       { label: "Sent",      color: "#7C3AED", bg: "rgba(124,58,237,0.12)" },
+  draft:      { label: "Draft",     color: "#6B7280", bg: "#6B7280" },
+  in_review:  { label: "In Review", color: "#D97706", bg: "#D97706" },
+  approved:   { label: "Approved",  color: "#16A34A", bg: "#16A34A" },
+  sent:       { label: "Sent",      color: "#7C3AED", bg: "#7C3AED" },
 };
 
 function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1); }
@@ -260,10 +260,10 @@ export default function ContentCalendar() {
                     key={e.id}
                     onClick={ev => { ev.stopPropagation(); setSelectedEntry(e); }}
                     className="flex items-center gap-1.5 px-2 py-1 rounded-[6px] text-[11px] font-semibold truncate cursor-pointer"
-                    style={{ background: s.bg, color: s.color }}
+                    style={{ background: s.bg, color: "#fff" }}
                     title={e.title}
                   >
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#fff" }} />
                     <span className="truncate">{e.title}</span>
                   </div>
                 );
