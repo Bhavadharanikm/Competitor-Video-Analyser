@@ -1,8 +1,23 @@
 "use client";
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import PinGate, { isCmsUnlocked } from "./cms/PinGate";
 
 export default function Navbar() {
+  const router = useRouter();
+  const [showPinGate, setShowPinGate] = useState(false);
+
+  const handleAvatarClick = () => {
+    if (isCmsUnlocked()) {
+      router.push("/cms");
+    } else {
+      setShowPinGate(true);
+    }
+  };
+
   return (
+    <>
     <motion.nav
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
@@ -40,13 +55,28 @@ export default function Navbar() {
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
           All systems ready
         </div>
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold text-white flex-shrink-0"
-          style={{ background: "#2563EB" }}
+        <button
+          onClick={handleAvatarClick}
+          className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold text-white flex-shrink-0 cursor-pointer"
+          style={{ background: "#2563EB", border: "none" }}
         >
           HG
-        </div>
+        </button>
       </div>
+
     </motion.nav>
+
+    <AnimatePresence>
+      {showPinGate && (
+        <PinGate
+          onClose={() => setShowPinGate(false)}
+          onSuccess={() => {
+            setShowPinGate(false);
+            router.push("/cms");
+          }}
+        />
+      )}
+    </AnimatePresence>
+    </>
   );
 }
