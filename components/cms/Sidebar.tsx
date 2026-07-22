@@ -10,7 +10,7 @@ const ACTIVE_BG = "rgba(37,99,235,0.1)";
 const NAV_ITEMS = [
   { href: "/cms", label: "Dashboard", icon: "home" },
   { href: "/cms/calendar", label: "Calendar", icon: "calendar" },
-  { href: "/cms/calendar?new=1", label: "Compose", icon: "pencil" },
+  { href: "/cms/compose", label: "Compose", icon: "pencil" },
   { href: "/cms/approvals", label: "Approvals", icon: "check", badgeKey: "approvals" as const },
   { href: "/cms/analytics", label: "Analytics", icon: "bars" },
   { href: "/cms/content-library", label: "Asset library", icon: "image" },
@@ -155,7 +155,7 @@ export default function Sidebar() {
         <ClientSwitcher />
 
         <button
-          onClick={() => router.push("/cms/calendar?new=1")}
+          onClick={() => router.push("/cms/compose")}
           className="w-full mb-5 py-2.5 rounded-[10px] text-[13px] font-bold cursor-pointer"
           style={{ background: ACTIVE_COLOR, color: "#fff", border: "none" }}
         >+ New post</button>

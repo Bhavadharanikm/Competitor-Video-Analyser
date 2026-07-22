@@ -25,7 +25,7 @@ export default function CalendarPage() {
           )}
         </div>
         <button
-          onClick={() => router.push("/cms/calendar?new=1")}
+          onClick={() => router.push("/cms/compose")}
           className="px-5 py-2.5 rounded-[10px] text-[14px] font-bold cursor-pointer"
           style={{ background: "#2563EB", color: "#fff", border: "none" }}
         >+ New post</button>
