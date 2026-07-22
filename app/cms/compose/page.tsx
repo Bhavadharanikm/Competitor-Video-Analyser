@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCmsClient } from "@/components/cms/ClientContext";
 import { FacebookIcon, InstagramIcon } from "@/components/cms/PlatformIcons";
 import { thumbGradient } from "@/components/cms/thumbGradient";
+import DriveMediaPreview from "@/components/cms/DriveMediaPreview";
 
 const ACTIVE_COLOR = "#2563EB";
 const CAPTION_LIMIT = 2200;
@@ -168,7 +169,13 @@ export default function ComposePage() {
           <div>
             <p className="text-[11px] font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--muted)" }}>Media</p>
             <div className="flex items-center gap-3">
-              <div className="w-20 h-20 rounded-[10px] flex-shrink-0" style={mediaUrl.trim() ? { background: thumbGradient(mediaUrl) } : { background: "var(--bg)", border: "1px dashed var(--border)" }} />
+              <div className="w-20 h-20 rounded-[10px] flex-shrink-0 overflow-hidden" style={!mediaUrl.trim() ? { background: "var(--bg)", border: "1px dashed var(--border)" } : undefined}>
+                <DriveMediaPreview
+                  url={mediaUrl}
+                  className="w-full h-full object-cover"
+                  fallback={<div className="w-full h-full" style={{ background: mediaUrl.trim() ? thumbGradient(mediaUrl) : "transparent" }} />}
+                />
+              </div>
               <div className="flex-1">
                 <input type="text" value={mediaUrl} onChange={e => setMediaUrl(e.target.value)} placeholder="https://… (Google Drive video/image link)" className="w-full rounded-[8px] px-3 py-2.5 text-[13px] outline-none" style={inputStyle} />
               </div>
@@ -259,7 +266,13 @@ export default function ComposePage() {
                 <span className="text-[13px] font-bold flex-1" style={{ color: "var(--text)" }}>{handle || "client"}</span>
                 <span style={{ color: "var(--muted)" }}>•••</span>
               </div>
-              <div className="w-full aspect-square" style={previewThumb ? { background: thumbGradient(previewThumb) } : { background: "var(--bg)" }} />
+              <div className="w-full aspect-square overflow-hidden" style={{ background: "var(--bg)" }}>
+                <DriveMediaPreview
+                  url={previewThumb}
+                  className="w-full h-full object-cover"
+                  fallback={<div className="w-full h-full" style={previewThumb ? { background: thumbGradient(previewThumb) } : undefined} />}
+                />
+              </div>
               <div className="flex items-center gap-3 px-4 pt-3 text-[18px]" style={{ color: "var(--text)" }}>
                 <span>♡</span><span>💬</span><span>➤</span>
                 <span className="ml-auto">🔖</span>
@@ -273,7 +286,12 @@ export default function ComposePage() {
           )}
 
           {contentType === "reel" && (
-            <div className="relative rounded-[20px] overflow-hidden mx-auto w-full max-w-[280px] aspect-[9/16]" style={previewThumb ? { background: thumbGradient(previewThumb) } : { background: "#1a1a1a" }}>
+            <div className="relative rounded-[20px] overflow-hidden mx-auto w-full max-w-[280px] aspect-[9/16]" style={{ background: "#1a1a1a" }}>
+              <DriveMediaPreview
+                url={previewThumb}
+                className="absolute inset-0 w-full h-full object-cover"
+                fallback={<div className="absolute inset-0" style={previewThumb ? { background: thumbGradient(previewThumb) } : undefined} />}
+              />
               <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, transparent 20%, transparent 60%, rgba(0,0,0,0.65) 100%)" }} />
 
               <div className="absolute top-3 left-3 text-[12px] font-bold text-white flex items-center gap-1.5">
@@ -308,7 +326,12 @@ export default function ComposePage() {
           )}
 
           {contentType === "story" && (
-            <div className="relative rounded-[20px] overflow-hidden mx-auto w-full max-w-[280px] aspect-[9/16]" style={previewThumb ? { background: thumbGradient(previewThumb) } : { background: "#1a1a1a" }}>
+            <div className="relative rounded-[20px] overflow-hidden mx-auto w-full max-w-[280px] aspect-[9/16]" style={{ background: "#1a1a1a" }}>
+              <DriveMediaPreview
+                url={previewThumb}
+                className="absolute inset-0 w-full h-full object-cover"
+                fallback={<div className="absolute inset-0" style={previewThumb ? { background: thumbGradient(previewThumb) } : undefined} />}
+              />
               <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 25%, transparent 80%, rgba(0,0,0,0.25) 100%)" }} />
 
               {/* Progress segments */}
@@ -332,7 +355,7 @@ export default function ComposePage() {
           )}
 
           <p className="text-[12px]" style={{ color: "var(--muted)" }}>
-            Preview is approximate — Meta renders the real post, and video thumbnails shown here are placeholders (we don&rsquo;t re-encode your video to preview it).
+            Preview is approximate — the media above is your actual file, but Meta&rsquo;s real post layout, cropping, and UI may differ slightly.
           </p>
         </div>
       </div>
