@@ -4,6 +4,7 @@ import { AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import PinGate, { isCmsUnlocked } from "@/components/cms/PinGate";
 import Sidebar from "@/components/cms/Sidebar";
+import { ClientProvider } from "@/components/cms/ClientContext";
 
 export default function CmsLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -29,11 +30,13 @@ export default function CmsLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="relative z-[1] min-h-screen flex" style={{ background: "#FFFFFF" }}>
-      <Sidebar />
-      <div className="flex-1 min-w-0 px-8 py-10">
-        {children}
+    <ClientProvider>
+      <div className="relative z-[1] min-h-screen flex" style={{ background: "#FFFFFF" }}>
+        <Sidebar />
+        <div className="flex-1 min-w-0 px-8 py-10">
+          {children}
+        </div>
       </div>
-    </div>
+    </ClientProvider>
   );
 }

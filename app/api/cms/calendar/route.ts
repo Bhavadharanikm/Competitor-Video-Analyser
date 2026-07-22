@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
     const from = req.nextUrl.searchParams.get("from");
     const to = req.nextUrl.searchParams.get("to");
     const clientPageId = req.nextUrl.searchParams.get("client_page_id");
+    const status = req.nextUrl.searchParams.get("status");
 
     const params = new URLSearchParams({
       select: "*",
@@ -34,6 +35,7 @@ export async function GET(req: NextRequest) {
     });
     if (from) params.set("scheduled_at", `gte.${from}`);
     if (clientPageId) params.set("client_page_id", `eq.${clientPageId}`);
+    if (status) params.set("status", `eq.${status}`);
 
     const res = await fetch(`${url}/rest/v1/${TABLE}?${params.toString()}`, { headers: supabaseHeaders(key), cache: "no-store" });
     if (!res.ok) return NextResponse.json({ error: await res.text() }, { status: 500 });

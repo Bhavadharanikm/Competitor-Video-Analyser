@@ -1,17 +1,13 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCmsClient, type CmsClient as Client } from "./ClientContext";
+import { FacebookIcon, InstagramIcon, PlatformIcons } from "./PlatformIcons";
 
 const ACTIVE_COLOR = "#2563EB";
 const ACTIVE_GLOW = "rgba(37,99,235,0.25)";
-// Warm beige surfaces used across the calendar card, instead of the app's default stark white.
-const CAL_BG = "#FAF7F1";
-const CAL_ALT_BG = "#F1EBDF";
-
-interface Client {
-  page_id: string;
-  name: string;
-  instagram_account_id: string | null;
-}
+const CAL_BG = "#FFFFFF";
+const CAL_ALT_BG = "#F7F7F8";
 
 interface CalendarEntry {
   id: string;
@@ -48,105 +44,25 @@ const STATUS_STYLES: Record<string, { label: string; color: string; bg: string }
 
 function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1); }
 function daysInMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); }
-// Monday-first weekday index (0=Mon .. 6=Sun)
-function mondayIndex(d: Date) { return (d.getDay() + 6) % 7; }
-function startOfWeek(d: Date) { const r = new Date(d); r.setDate(r.getDate() - mondayIndex(r)); r.setHours(0, 0, 0, 0); return r; }
+// Sunday-first weekday index (0=Sun .. 6=Sat)
+function sundayIndex(d: Date) { return d.getDay(); }
+function startOfWeek(d: Date) { const r = new Date(d); r.setDate(r.getDate() - sundayIndex(r)); r.setHours(0, 0, 0, 0); return r; }
 function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
 
-const CLIENT_STORAGE_KEY = "cms_selected_client";
 const VIEW_STORAGE_KEY = "cms_calendar_view";
 
-let iconIdCounter = 0;
-
-/**
- * Colorful little brand badges — Meta doesn't give us real logos to embed, so these are
- * hand-drawn SVGs. Each gets a white ring so it stays legible against any status pill color
- * instead of blending into similarly-saturated backgrounds (e.g. blue icon on a purple pill).
- */
-function FacebookIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" className="flex-shrink-0" style={{ filter: "drop-shadow(0 0 0.5px rgba(0,0,0,0.15))" }}>
-      <circle cx="12" cy="12" r="12" fill="#fff" />
-      <circle cx="12" cy="12" r="10.5" fill="#1877F2" />
-      <path d="M15.5 8.5h-1.7c-.4 0-.8.4-.8.9V11h2.4l-.3 2.4h-2.1V19h-2.4v-5.6H8.7V11h1.9V9.1c0-1.9 1.1-3 3-3h2v2.4Z" fill="#fff" />
-    </svg>
-  );
-}
-
-function InstagramIcon({ size = 16 }: { size?: number }) {
-  const [gid] = useState(() => `ig-grad-${iconIdCounter++}`);
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" className="flex-shrink-0" style={{ filter: "drop-shadow(0 0 0.5px rgba(0,0,0,0.15))" }}>
-      <defs>
-        <radialGradient id={gid} cx="30%" cy="107%" r="150%">
-          <stop offset="0%" stopColor="#fdf497" />
-          <stop offset="20%" stopColor="#fdf497" />
-          <stop offset="45%" stopColor="#fd5949" />
-          <stop offset="65%" stopColor="#d6249f" />
-          <stop offset="100%" stopColor="#285AEB" />
-        </radialGradient>
-      </defs>
-      <circle cx="12" cy="12" r="12" fill="#fff" />
-      <circle cx="12" cy="12" r="10.5" fill={`url(#${gid})`} />
-      <rect x="7.6" y="7.6" width="8.8" height="8.8" rx="2.6" fill="none" stroke="#fff" strokeWidth="1.3" />
-      <circle cx="12" cy="12" r="2.4" fill="none" stroke="#fff" strokeWidth="1.3" />
-      <circle cx="14.9" cy="9.1" r="0.6" fill="#fff" />
-    </svg>
-  );
-}
-
-function PlatformIcons({ platform, size = 16 }: { platform: string; size?: number }) {
-  return (
-    <span className="flex items-center -space-x-1.5 flex-shrink-0">
-      {(platform === "both" || platform === "facebook") && <FacebookIcon size={size} />}
-      {(platform === "both" || platform === "instagram") && <InstagramIcon size={size} />}
-    </span>
-  );
-}
-
-/** Generic film-strip glyph shown when an entry has no thumbnail image to preview yet. */
-function MediaPlaceholderIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <rect x="2.5" y="4.5" width="19" height="15" rx="2" stroke="rgba(255,255,255,0.75)" strokeWidth="1.6" />
-      <path d="M8 4.5v15M16 4.5v15" stroke="rgba(255,255,255,0.75)" strokeWidth="1.6" />
-      <path d="M2.5 9h5.5M2.5 15h5.5M16 9h5.5M16 15h5.5" stroke="rgba(255,255,255,0.75)" strokeWidth="1.6" />
-    </svg>
-  );
-}
-
-/** Small thumbnail preview for a calendar entry, with its platform badge(s) overlapping the corner. */
-function EntryThumb({ entry, size = 30 }: { entry: CalendarEntry; size?: number }) {
-  return (
-    <span className="relative flex-shrink-0" style={{ width: size, height: size }}>
-      <span
-        className="w-full h-full rounded-[7px] overflow-hidden flex items-center justify-center"
-        style={{ background: "rgba(255,255,255,0.28)" }}
-      >
-        {entry.custom_thumbnail_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={entry.custom_thumbnail_url} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <MediaPlaceholderIcon size={size * 0.5} />
-        )}
-      </span>
-      <span className="absolute flex items-center" style={{ bottom: -4, right: -4, transform: "scale(0.62)", transformOrigin: "bottom right" }}>
-        <PlatformIcons platform={entry.platform} size={16} />
-      </span>
-    </span>
-  );
-}
 
 export default function ContentCalendar() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { sortedClients, selectedClientPageId } = useCmsClient();
+
   const [view, setView] = useState<"month" | "week">(() => {
     if (typeof window === "undefined") return "month";
     return (localStorage.getItem(VIEW_STORAGE_KEY) as "month" | "week") ?? "month";
   });
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [clientsLoading, setClientsLoading] = useState(true);
-  const [selectedClientPageId, setSelectedClientPageId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [addDate, setAddDate] = useState<string | null>(null);
@@ -155,7 +71,15 @@ export default function ContentCalendar() {
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
 
-  const sortedClients = useMemo(() => [...clients].sort((a, b) => a.name.localeCompare(b.name)), [clients]);
+  // "+ New post" in the sidebar links here with ?new=1 to open today's Add Entry modal directly.
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setAddDate(new Date().toISOString().slice(0, 10));
+      setAddHour(null);
+      setShowAdd(true);
+      router.replace("/cms/calendar");
+    }
+  }, [searchParams, router]);
 
   const changeView = (v: "month" | "week") => {
     setView(v);
@@ -172,7 +96,7 @@ export default function ContentCalendar() {
   const grid = useMemo(() => {
     const first = startOfMonth(cursor);
     const total = daysInMonth(cursor);
-    const leadingBlanks = mondayIndex(first);
+    const leadingBlanks = sundayIndex(first);
     const cells: { date: Date; inMonth: boolean }[] = [];
     for (let i = leadingBlanks; i > 0; i--) {
       const d = new Date(first);
@@ -211,46 +135,6 @@ export default function ContentCalendar() {
 
   useEffect(() => { fetchEntries(); }, [cursor, view, selectedClientPageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchClients = (preserveSelection: boolean) => {
-    setClientsLoading(true);
-    fetch("/api/cms/clients")
-      .then(r => r.json())
-      .then(data => {
-        const list: Client[] = data.clients ?? [];
-        setClients(list);
-        if (preserveSelection && selectedClientPageId && list.some(c => c.page_id === selectedClientPageId)) return;
-        const stored = typeof window !== "undefined" ? localStorage.getItem(CLIENT_STORAGE_KEY) : null;
-        const initial = list.find(c => c.page_id === stored)?.page_id ?? list[0]?.page_id ?? "";
-        setSelectedClientPageId(initial);
-      })
-      .catch(() => {})
-      .finally(() => setClientsLoading(false));
-  };
-
-  useEffect(() => { fetchClients(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleClientChange = (pageId: string) => {
-    setSelectedClientPageId(pageId);
-    if (typeof window !== "undefined") localStorage.setItem(CLIENT_STORAGE_KEY, pageId);
-  };
-
-  const [syncing, setSyncing] = useState(false);
-  const [syncError, setSyncError] = useState<string | null>(null);
-
-  const syncClients = async () => {
-    setSyncing(true);
-    setSyncError(null);
-    try {
-      const res = await fetch("/api/cms/clients/sync", { method: "POST" });
-      if (!res.ok) throw new Error((await res.text()) || "Sync failed");
-      fetchClients(true);
-    } catch (err) {
-      setSyncError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const entriesByDay = useMemo(() => {
     const map: Record<string, CalendarEntry[]> = {};
     for (const e of entries) {
@@ -259,12 +143,6 @@ export default function ContentCalendar() {
       map[key].push(e);
     }
     return map;
-  }, [entries]);
-
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { draft: 0, in_review: 0, approved: 0, sent: 0 };
-    for (const e of entries) c[e.status] = (c[e.status] ?? 0) + 1;
-    return c;
   }, [entries]);
 
   const dateKey = (d: Date) => d.toISOString().slice(0, 10);
@@ -304,53 +182,27 @@ export default function ContentCalendar() {
 
   return (
     <div className="relative z-[1] rounded-3xl overflow-hidden" style={{ background: CAL_BG, border: "1px solid var(--border)" }}>
-      {/* Client selector */}
-      <div className="flex items-center gap-3 px-7 py-5" style={{ borderBottom: "1px solid var(--border)", background: CAL_BG }}>
-        <span className="text-[13px] font-semibold tracking-widest uppercase flex-shrink-0" style={{ color: "var(--muted)" }}>Client</span>
-        <select
-          value={selectedClientPageId}
-          onChange={e => handleClientChange(e.target.value)}
-          disabled={clientsLoading || clients.length === 0}
-          className="rounded-[8px] px-4 py-2.5 text-[15px] font-semibold outline-none cursor-pointer disabled:opacity-50"
-          style={{ background: CAL_ALT_BG, border: `1.5px solid ${ACTIVE_COLOR}`, color: "var(--text)", minWidth: 260 }}
-        >
-          {clientsLoading && <option>Loading clients…</option>}
-          {!clientsLoading && clients.length === 0 && <option value="">No clients synced yet</option>}
-          {sortedClients.map(c => <option key={c.page_id} value={c.page_id}>{c.name}</option>)}
-        </select>
-        {clients.length > 0 && (
-          <span className="text-[13px]" style={{ color: "var(--muted)" }}>{clients.length} client{clients.length !== 1 ? "s" : ""} synced</span>
-        )}
-        <button
-          onClick={syncClients}
-          disabled={syncing}
-          className="ml-auto px-4 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer disabled:opacity-50"
-          style={{ background: CAL_ALT_BG, border: "1px solid var(--border)", color: "var(--text)" }}
-        >{syncing ? "Syncing…" : "↻ Sync from Meta"}</button>
-        {syncError && <span className="text-[13px]" style={{ color: "#EF4444" }}>{syncError}</span>}
-      </div>
-
       {/* Header */}
       <div className="flex items-center justify-between px-7 py-6 flex-wrap gap-3" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setCursor(c => view === "month" ? new Date(c.getFullYear(), c.getMonth() - 1, 1) : addDays(c, -7))}
             className="w-10 h-10 rounded-full flex items-center justify-center cursor-pointer text-[16px]"
-            style={{ background: CAL_BG, border: "1px solid var(--border)", color: "var(--text)" }}
+            style={{ background: CAL_ALT_BG, border: "1px solid var(--border)", color: "var(--text)" }}
           >←</button>
           <h2 className="text-[26px] font-bold whitespace-nowrap" style={{ color: "var(--text)" }}>{view === "month" ? monthLabel : weekLabel}</h2>
           <button
             onClick={() => setCursor(c => view === "month" ? new Date(c.getFullYear(), c.getMonth() + 1, 1) : addDays(c, 7))}
             className="w-10 h-10 rounded-full flex items-center justify-center cursor-pointer text-[16px]"
-            style={{ background: CAL_BG, border: "1px solid var(--border)", color: "var(--text)" }}
+            style={{ background: CAL_ALT_BG, border: "1px solid var(--border)", color: "var(--text)" }}
           >→</button>
           <button
             onClick={() => setCursor(view === "month" ? startOfMonth(new Date()) : new Date())}
             className="px-4 py-2 rounded-[8px] text-[14px] font-semibold cursor-pointer"
-            style={{ background: CAL_BG, border: "1px solid var(--border)", color: "var(--muted)" }}
+            style={{ background: CAL_ALT_BG, border: "1px solid var(--border)", color: "var(--muted)" }}
           >Today</button>
 
-          <div className="flex items-center rounded-[9px] p-1 ml-1" style={{ background: CAL_BG, border: "1px solid var(--border)" }}>
+          <div className="flex items-center rounded-[9px] p-1 ml-1" style={{ background: CAL_ALT_BG, border: "1px solid var(--border)" }}>
             {(["month", "week"] as const).map(v => (
               <button
                 key={v}
@@ -362,18 +214,13 @@ export default function ContentCalendar() {
           </div>
         </div>
 
-        <div className="flex items-center gap-5 flex-wrap">
-          {Object.entries(STATUS_STYLES).map(([key, s]) => (
-            <div key={key} className="flex items-center gap-1.5 text-[14px]" style={{ color: "var(--muted)" }}>
-              <span className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
-              {s.label}{counts[key] > 0 ? ` (${counts[key]})` : ""}
-            </div>
-          ))}
-          <button
-            onClick={() => { setAddDate(dateKey(new Date())); setAddHour(null); setShowAdd(true); }}
-            className="px-5 py-2.5 rounded-[10px] text-[14px] font-bold cursor-pointer"
-            style={{ background: ACTIVE_COLOR, color: "#fff", boxShadow: `0 0 14px ${ACTIVE_GLOW}`, border: "none" }}
-          >+ Add Entry</button>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: "var(--muted)" }}>
+            <InstagramIcon size={15} /> Instagram
+          </div>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: "var(--muted)" }}>
+            <FacebookIcon size={15} /> Facebook
+          </div>
         </div>
       </div>
 
@@ -403,7 +250,7 @@ export default function ContentCalendar() {
         <>
           {/* Weekday row */}
           <div className="grid grid-cols-7" style={{ borderBottom: "1px solid var(--border)" }}>
-            {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(d => (
+            {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map(d => (
               <div key={d} className="px-4 py-3 text-[13px] font-semibold tracking-widest" style={{ color: "var(--muted)" }}>{d}</div>
             ))}
           </div>
@@ -433,37 +280,34 @@ export default function ContentCalendar() {
                     if (id) moveEntry(id, date);
                   }}
                 >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className="text-[15px] font-semibold w-8 h-8 rounded-full flex items-center justify-center"
-                      style={
-                        key === dateKey(new Date())
-                          ? { background: "var(--text)", color: "var(--surface)" }
-                          : { color: inMonth ? "var(--text)" : "var(--muted)" }
-                      }
-                    >
-                      {date.getDate()}
-                    </span>
-                    {dayEntries.length > 0 && (
-                      <span className="text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center" style={{ background: ACTIVE_COLOR, color: "#fff" }}>
-                        {dayEntries.length}
-                      </span>
-                    )}
-                  </div>
+                  <span
+                    className="text-[15px] font-semibold w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={
+                      key === dateKey(new Date())
+                        ? { background: "var(--text)", color: "var(--surface)" }
+                        : { color: inMonth ? "var(--text)" : "var(--muted)" }
+                    }
+                  >
+                    {date.getDate()}
+                  </span>
                   {dayEntries.map(e => {
                     const s = STATUS_STYLES[e.status] ?? STATUS_STYLES.draft;
+                    const time = new Date(e.scheduled_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase().replace(" ", "");
                     return (
                       <div
                         key={e.id}
                         draggable
                         onDragStart={ev => ev.dataTransfer.setData("text/plain", e.id)}
                         onClick={ev => { ev.stopPropagation(); setSelectedEntry(e); }}
-                        className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-[6px] text-[13px] font-semibold truncate cursor-grab active:cursor-grabbing"
-                        style={{ background: s.bg, color: "#fff" }}
+                        className="flex flex-col gap-0.5 pl-2 pr-2 py-1.5 rounded-[7px] cursor-grab active:cursor-grabbing"
+                        style={{ background: CAL_ALT_BG, border: "1px solid var(--border)", borderLeft: `3px solid ${s.color}` }}
                         title={e.title}
                       >
-                        <EntryThumb entry={e} size={26} />
-                        <span className="truncate">{e.title}</span>
+                        <div className="flex items-center gap-1.5">
+                          <PlatformIcons platform={e.platform} size={13} />
+                          <span className="text-[11px] font-semibold" style={{ color: "var(--muted)" }}>{time}</span>
+                        </div>
+                        <span className="text-[12.5px] font-semibold truncate" style={{ color: "var(--text)" }}>{e.title}</span>
                       </div>
                     );
                   })}
@@ -478,12 +322,12 @@ export default function ContentCalendar() {
           entries={entries}
           dragOverKey={dragOverKey}
           setDragOverKey={setDragOverKey}
-          onDrop={(id, date, hour) => moveEntry(id, date, hour)}
+          onDrop={(id, date) => moveEntry(id, date)}
           onSelect={setSelectedEntry}
-          onAddAt={(date, hour) => {
+          onAddAt={(date) => {
             setAddDate(dateKey(date));
             setShowAdd(true);
-            setAddHour(hour);
+            setAddHour(null);
           }}
         />
       )}
@@ -514,104 +358,115 @@ export default function ContentCalendar() {
   );
 }
 
+// Warm gradient placeholders shown when an entry has no custom thumbnail image, picked
+// deterministically per entry so the same card always gets the same color.
+const THUMB_GRADIENTS = [
+  "linear-gradient(160deg, #6B4A32, #B98A5E)",
+  "linear-gradient(160deg, #8A5A34, #D9A066)",
+  "linear-gradient(160deg, #C98A4B, #EFC48C)",
+  "linear-gradient(160deg, #4A6B5A, #8FBFA3)",
+  "linear-gradient(160deg, #5A4A6B, #A98FBF)",
+  "linear-gradient(160deg, #6B5A4A, #D9BF8F)",
+];
+function thumbGradient(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return THUMB_GRADIENTS[hash % THUMB_GRADIENTS.length];
+}
+
 function WeekView({ weekDays, entries, dragOverKey, setDragOverKey, onDrop, onSelect, onAddAt }: {
   weekDays: Date[];
   entries: CalendarEntry[];
   dragOverKey: string | null;
   setDragOverKey: (updater: string | null | ((k: string | null) => string | null)) => void;
-  onDrop: (id: string, date: Date, hour: number) => void;
+  onDrop: (id: string, date: Date) => void;
   onSelect: (entry: CalendarEntry) => void;
-  onAddAt: (date: Date, hour: number) => void;
+  onAddAt: (date: Date) => void;
 }) {
-  const HOURS = Array.from({ length: 18 }, (_, i) => i + 6); // 6 AM .. 11 PM
   const dateKey = (d: Date) => d.toISOString().slice(0, 10);
   const today = dateKey(new Date());
 
-  const entriesBySlot = useMemo(() => {
+  const entriesByDay = useMemo(() => {
     const map: Record<string, CalendarEntry[]> = {};
     for (const e of entries) {
-      const d = new Date(e.scheduled_at);
-      const key = `${dateKey(d)}-${d.getHours()}`;
+      const key = dateKey(new Date(e.scheduled_at));
       if (!map[key]) map[key] = [];
       map[key].push(e);
+    }
+    for (const key of Object.keys(map)) {
+      map[key].sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
     }
     return map;
   }, [entries]);
 
-  const formatHour = (h: number) => {
-    const period = h < 12 ? "AM" : "PM";
-    const hour12 = h % 12 === 0 ? 12 : h % 12;
-    return `${hour12} ${period}`;
-  };
-
   return (
-    <div className="flex overflow-auto" style={{ maxHeight: 840 }}>
-      <div className="flex-shrink-0 w-20" style={{ borderRight: "1px solid var(--border)" }}>
-        <div className="h-14 sticky top-0 z-10" style={{ borderBottom: "1px solid var(--border)", background: CAL_ALT_BG }} />
-        {HOURS.map(h => (
-          <div key={h} className="h-20 px-2.5 pt-1 text-[12px] font-semibold text-right" style={{ color: "var(--muted)" }}>
-            {formatHour(h)}
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 flex-1 min-w-[900px]">
-        {weekDays.map((date, di) => {
-          const key = dateKey(date);
-          const isToday = key === today;
-          return (
-            <div key={di} style={{ borderRight: di < 6 ? "1px solid var(--border)" : "none" }}>
-              <div
-                className="h-14 flex flex-col items-center justify-center sticky top-0 z-10"
-                style={{ borderBottom: "1px solid var(--border)", background: isToday ? CAL_BG : CAL_ALT_BG }}
+    <div className="grid grid-cols-7">
+      {weekDays.map((date, di) => {
+        const key = dateKey(date);
+        const isToday = key === today;
+        const dayEntries = entriesByDay[key] ?? [];
+        const isDragOver = dragOverKey === key;
+        return (
+          <div key={di} className="flex flex-col" style={{ borderRight: di < 6 ? "1px solid var(--border)" : "none" }}>
+            <div
+              className="flex items-center justify-between px-3 py-3"
+              style={{ borderBottom: "1px solid var(--border)", background: isToday ? ACTIVE_GLOW : "transparent" }}
+            >
+              <span className="text-[12px] font-semibold tracking-widest" style={{ color: "var(--muted)" }}>
+                {date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()}
+              </span>
+              <span
+                className="text-[15px] font-bold w-7 h-7 rounded-full flex items-center justify-center"
+                style={isToday ? { background: ACTIVE_COLOR, color: "#fff" } : { color: "var(--text)" }}
               >
-                <span className="text-[12px] font-semibold tracking-widest" style={{ color: "var(--muted)" }}>
-                  {date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()}
-                </span>
-                <span className="text-[16px] font-bold" style={isToday ? { color: ACTIVE_COLOR } : { color: "var(--text)" }}>{date.getDate()}</span>
-              </div>
-              {HOURS.map(h => {
-                const slotKey = `${key}-${h}`;
-                const slotEntries = entriesBySlot[slotKey] ?? [];
-                const isDragOver = dragOverKey === slotKey;
+                {date.getDate()}
+              </span>
+            </div>
+            <div
+              className="flex-1 flex flex-col gap-3 p-3 cursor-pointer"
+              style={{ minHeight: 220, background: isDragOver ? ACTIVE_GLOW : "transparent" }}
+              onClick={() => onAddAt(date)}
+              onDragOver={ev => { ev.preventDefault(); setDragOverKey(key); }}
+              onDragLeave={() => setDragOverKey(k => k === key ? null : k)}
+              onDrop={ev => {
+                ev.preventDefault();
+                setDragOverKey(null);
+                const id = ev.dataTransfer.getData("text/plain");
+                if (id) onDrop(id, date);
+              }}
+            >
+              {dayEntries.map(e => {
+                const time = new Date(e.scheduled_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase().replace(" ", "");
                 return (
                   <div
-                    key={h}
-                    className="h-20 px-1.5 py-1.5 flex flex-col gap-1.5 cursor-pointer"
-                    style={{ borderBottom: "1px solid var(--border)", background: isDragOver ? ACTIVE_GLOW : "transparent" }}
-                    onClick={() => onAddAt(date, h)}
-                    onDragOver={ev => { ev.preventDefault(); setDragOverKey(slotKey); }}
-                    onDragLeave={() => setDragOverKey(k => k === slotKey ? null : k)}
-                    onDrop={ev => {
-                      ev.preventDefault();
-                      setDragOverKey(null);
-                      const id = ev.dataTransfer.getData("text/plain");
-                      if (id) onDrop(id, date, h);
-                    }}
+                    key={e.id}
+                    draggable
+                    onDragStart={ev => ev.dataTransfer.setData("text/plain", e.id)}
+                    onClick={ev => { ev.stopPropagation(); onSelect(e); }}
+                    className="rounded-[12px] overflow-hidden cursor-grab active:cursor-grabbing flex-shrink-0"
+                    style={{ background: CAL_BG, border: "1px solid var(--border)", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
+                    title={e.title}
                   >
-                    {slotEntries.map(e => {
-                      const s = STATUS_STYLES[e.status] ?? STATUS_STYLES.draft;
-                      return (
-                        <div
-                          key={e.id}
-                          draggable
-                          onDragStart={ev => ev.dataTransfer.setData("text/plain", e.id)}
-                          onClick={ev => { ev.stopPropagation(); onSelect(e); }}
-                          className="flex items-center gap-1.5 pl-1 pr-2 py-1.5 rounded-[5px] text-[12px] font-semibold truncate cursor-grab active:cursor-grabbing"
-                          style={{ background: s.bg, color: "#fff" }}
-                          title={e.title}
-                        >
-                          <EntryThumb entry={e} size={22} />
-                          <span className="truncate">{e.title}</span>
-                        </div>
-                      );
-                    })}
+                    <div
+                      className="w-full h-[84px]"
+                      style={e.custom_thumbnail_url
+                        ? { backgroundImage: `url(${e.custom_thumbnail_url})`, backgroundSize: "cover", backgroundPosition: "center" }
+                        : { background: thumbGradient(e.id) }}
+                    />
+                    <div className="px-2.5 py-2 flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <PlatformIcons platform={e.platform} size={16} />
+                        <span className="text-[11px] font-semibold" style={{ color: "var(--muted)" }}>{time}</span>
+                      </div>
+                      <span className="text-[13px] font-semibold leading-snug" style={{ color: "var(--text)" }}>{e.title}</span>
+                    </div>
                   </div>
                 );
               })}
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
