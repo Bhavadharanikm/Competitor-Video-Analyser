@@ -57,7 +57,7 @@ export default function ClientsPage() {
     <div className="max-w-[1760px]">
       <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
         <div>
-          <p className="text-[12px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--muted)" }}>Content Management System</p>
+          <p className="text-[12px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--muted)" }}>Social Media Planner</p>
           <h1 className="text-[34px] font-bold" style={{ color: "var(--text)" }}>Clients</h1>
         </div>
         <div className="flex items-center gap-3">

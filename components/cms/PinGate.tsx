@@ -80,7 +80,7 @@ export default function PinGate({ onSuccess, onClose }: Props) {
         onClick={e => e.stopPropagation()}
       >
         <div>
-          <p className="text-[16px] font-bold text-center" style={{ color: "var(--text)" }}>Content Management System</p>
+          <p className="text-[16px] font-bold text-center" style={{ color: "var(--text)" }}>Social Media Planner</p>
           <p className="text-[12px] mt-1 text-center" style={{ color: "var(--muted)" }}>Enter your 4-digit code to continue</p>
         </div>
 

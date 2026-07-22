@@ -29,7 +29,7 @@ export default function CmsLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex" style={{ background: "var(--bg)" }}>
+    <div className="relative z-[1] min-h-screen flex" style={{ background: "#FFFFFF" }}>
       <Sidebar />
       <div className="flex-1 min-w-0 px-8 py-10">
         {children}
