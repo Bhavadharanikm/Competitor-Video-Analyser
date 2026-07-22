@@ -1,51 +1,37 @@
 "use client";
-import { useEffect, useState } from "react";
-import { AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import PinGate, { isCmsUnlocked } from "@/components/cms/PinGate";
-import ContentCalendar from "@/components/cms/ContentCalendar";
+import StatCards from "@/components/cms/StatCards";
 
-export default function CmsPage() {
+const SHORTCUTS = [
+  { href: "/cms/calendar", label: "Open Content Calendar", desc: "Schedule and publish reels & posts" },
+  { href: "/cms/clients", label: "View Clients", desc: "Connected Facebook & Instagram accounts" },
+  { href: "/cms/analytics", label: "View Analytics", desc: "Scheduled, approvals, published" },
+];
+
+export default function DashboardPage() {
   const router = useRouter();
-  const [unlocked, setUnlocked] = useState(false);
-  const [checked, setChecked] = useState(false);
-
-  useEffect(() => {
-    setUnlocked(isCmsUnlocked());
-    setChecked(true);
-  }, []);
-
-  if (!checked) return null;
-
-  if (!unlocked) {
-    return (
-      <AnimatePresence>
-        <PinGate
-          onClose={() => router.push("/")}
-          onSuccess={() => setUnlocked(true)}
-        />
-      </AnimatePresence>
-    );
-  }
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
-      <div className="max-w-[1760px] mx-auto px-8 py-10">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <p className="text-[12px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--muted)" }}>Content Management System</p>
-            <h1 className="text-[34px] font-bold" style={{ color: "var(--text)" }}>Content Calendar</h1>
-          </div>
-          <button
-            onClick={() => router.push("/")}
-            className="px-4 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer"
-            style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none" }}
-          >
-            ← Back to Video Analyser
-          </button>
-        </div>
+    <div className="max-w-[1760px]">
+      <div className="mb-8">
+        <p className="text-[12px] font-semibold tracking-widest uppercase mb-1" style={{ color: "var(--muted)" }}>Content Management System</p>
+        <h1 className="text-[34px] font-bold" style={{ color: "var(--text)" }}>Dashboard</h1>
+      </div>
 
-        <ContentCalendar />
+      <StatCards />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+        {SHORTCUTS.map(s => (
+          <button
+            key={s.href}
+            onClick={() => router.push(s.href)}
+            className="text-left rounded-[16px] p-5 cursor-pointer"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+          >
+            <p className="text-[14px] font-bold mb-1" style={{ color: "var(--text)" }}>{s.label}</p>
+            <p className="text-[12px]" style={{ color: "var(--muted)" }}>{s.desc}</p>
+          </button>
+        ))}
       </div>
     </div>
   );

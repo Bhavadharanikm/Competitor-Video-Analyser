@@ -10,7 +10,7 @@ export default function Navbar() {
 
   const handleAvatarClick = () => {
     if (isCmsUnlocked()) {
-      router.push("/cms");
+      router.push("/cms/calendar");
     } else {
       setShowPinGate(true);
     }
@@ -72,7 +72,7 @@ export default function Navbar() {
           onClose={() => setShowPinGate(false)}
           onSuccess={() => {
             setShowPinGate(false);
-            router.push("/cms");
+            router.push("/cms/calendar");
           }}
         />
       )}
