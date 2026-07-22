@@ -58,11 +58,16 @@ const VIEW_STORAGE_KEY = "cms_calendar_view";
 
 let iconIdCounter = 0;
 
-/** Colorful little brand badges — Meta doesn't give us real logos to embed, so these are hand-drawn SVGs. */
+/**
+ * Colorful little brand badges — Meta doesn't give us real logos to embed, so these are
+ * hand-drawn SVGs. Each gets a white ring so it stays legible against any status pill color
+ * instead of blending into similarly-saturated backgrounds (e.g. blue icon on a purple pill).
+ */
 function FacebookIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" className="flex-shrink-0">
-      <circle cx="12" cy="12" r="12" fill="#1877F2" />
+    <svg width={size} height={size} viewBox="0 0 24 24" className="flex-shrink-0" style={{ filter: "drop-shadow(0 0 0.5px rgba(0,0,0,0.15))" }}>
+      <circle cx="12" cy="12" r="12" fill="#fff" />
+      <circle cx="12" cy="12" r="10.5" fill="#1877F2" />
       <path d="M15.5 8.5h-1.7c-.4 0-.8.4-.8.9V11h2.4l-.3 2.4h-2.1V19h-2.4v-5.6H8.7V11h1.9V9.1c0-1.9 1.1-3 3-3h2v2.4Z" fill="#fff" />
     </svg>
   );
@@ -71,7 +76,7 @@ function FacebookIcon({ size = 16 }: { size?: number }) {
 function InstagramIcon({ size = 16 }: { size?: number }) {
   const [gid] = useState(() => `ig-grad-${iconIdCounter++}`);
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" className="flex-shrink-0">
+    <svg width={size} height={size} viewBox="0 0 24 24" className="flex-shrink-0" style={{ filter: "drop-shadow(0 0 0.5px rgba(0,0,0,0.15))" }}>
       <defs>
         <radialGradient id={gid} cx="30%" cy="107%" r="150%">
           <stop offset="0%" stopColor="#fdf497" />
@@ -81,10 +86,11 @@ function InstagramIcon({ size = 16 }: { size?: number }) {
           <stop offset="100%" stopColor="#285AEB" />
         </radialGradient>
       </defs>
-      <circle cx="12" cy="12" r="12" fill={`url(#${gid})`} />
-      <rect x="7.2" y="7.2" width="9.6" height="9.6" rx="3" fill="none" stroke="#fff" strokeWidth="1.3" />
-      <circle cx="12" cy="12" r="2.6" fill="none" stroke="#fff" strokeWidth="1.3" />
-      <circle cx="15.2" cy="8.8" r="0.6" fill="#fff" />
+      <circle cx="12" cy="12" r="12" fill="#fff" />
+      <circle cx="12" cy="12" r="10.5" fill={`url(#${gid})`} />
+      <rect x="7.6" y="7.6" width="8.8" height="8.8" rx="2.6" fill="none" stroke="#fff" strokeWidth="1.3" />
+      <circle cx="12" cy="12" r="2.4" fill="none" stroke="#fff" strokeWidth="1.3" />
+      <circle cx="14.9" cy="9.1" r="0.6" fill="#fff" />
     </svg>
   );
 }
@@ -94,6 +100,39 @@ function PlatformIcons({ platform, size = 16 }: { platform: string; size?: numbe
     <span className="flex items-center -space-x-1.5 flex-shrink-0">
       {(platform === "both" || platform === "facebook") && <FacebookIcon size={size} />}
       {(platform === "both" || platform === "instagram") && <InstagramIcon size={size} />}
+    </span>
+  );
+}
+
+/** Generic film-strip glyph shown when an entry has no thumbnail image to preview yet. */
+function MediaPlaceholderIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="2.5" y="4.5" width="19" height="15" rx="2" stroke="rgba(255,255,255,0.75)" strokeWidth="1.6" />
+      <path d="M8 4.5v15M16 4.5v15" stroke="rgba(255,255,255,0.75)" strokeWidth="1.6" />
+      <path d="M2.5 9h5.5M2.5 15h5.5M16 9h5.5M16 15h5.5" stroke="rgba(255,255,255,0.75)" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+/** Small thumbnail preview for a calendar entry, with its platform badge(s) overlapping the corner. */
+function EntryThumb({ entry, size = 30 }: { entry: CalendarEntry; size?: number }) {
+  return (
+    <span className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <span
+        className="w-full h-full rounded-[7px] overflow-hidden flex items-center justify-center"
+        style={{ background: "rgba(255,255,255,0.28)" }}
+      >
+        {entry.custom_thumbnail_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={entry.custom_thumbnail_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <MediaPlaceholderIcon size={size * 0.5} />
+        )}
+      </span>
+      <span className="absolute flex items-center" style={{ bottom: -4, right: -4, transform: "scale(0.62)", transformOrigin: "bottom right" }}>
+        <PlatformIcons platform={entry.platform} size={16} />
+      </span>
     </span>
   );
 }
@@ -419,11 +458,11 @@ export default function ContentCalendar() {
                         draggable
                         onDragStart={ev => ev.dataTransfer.setData("text/plain", e.id)}
                         onClick={ev => { ev.stopPropagation(); setSelectedEntry(e); }}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[6px] text-[13px] font-semibold truncate cursor-grab active:cursor-grabbing"
+                        className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-[6px] text-[13px] font-semibold truncate cursor-grab active:cursor-grabbing"
                         style={{ background: s.bg, color: "#fff" }}
                         title={e.title}
                       >
-                        <PlatformIcons platform={e.platform} size={15} />
+                        <EntryThumb entry={e} size={26} />
                         <span className="truncate">{e.title}</span>
                       </div>
                     );
@@ -557,11 +596,11 @@ function WeekView({ weekDays, entries, dragOverKey, setDragOverKey, onDrop, onSe
                           draggable
                           onDragStart={ev => ev.dataTransfer.setData("text/plain", e.id)}
                           onClick={ev => { ev.stopPropagation(); onSelect(e); }}
-                          className="flex items-center gap-1.5 px-2 py-1.5 rounded-[5px] text-[12px] font-semibold truncate cursor-grab active:cursor-grabbing"
+                          className="flex items-center gap-1.5 pl-1 pr-2 py-1.5 rounded-[5px] text-[12px] font-semibold truncate cursor-grab active:cursor-grabbing"
                           style={{ background: s.bg, color: "#fff" }}
                           title={e.title}
                         >
-                          <PlatformIcons platform={e.platform} size={13} />
+                          <EntryThumb entry={e} size={22} />
                           <span className="truncate">{e.title}</span>
                         </div>
                       );
