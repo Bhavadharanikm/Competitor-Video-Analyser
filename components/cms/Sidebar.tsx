@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/cms", label: "Dashboard", icon: "home" },
   { href: "/cms/calendar", label: "Calendar", icon: "calendar" },
   { href: "/cms/compose", label: "Compose", icon: "pencil" },
+  { href: "/cms/queue", label: "Publishing queue", icon: "clock" },
   { href: "/cms/approvals", label: "Approvals", icon: "check", badgeKey: "approvals" as const },
   { href: "/cms/analytics", label: "Analytics", icon: "bars" },
   { href: "/cms/content-library", label: "Asset library", icon: "image" },

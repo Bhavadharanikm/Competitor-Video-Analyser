@@ -3,13 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCmsClient, type CmsClient as Client } from "./ClientContext";
 import { FacebookIcon, InstagramIcon, PlatformIcons } from "./PlatformIcons";
+import { thumbGradient } from "./thumbGradient";
 
 const ACTIVE_COLOR = "#2563EB";
 const ACTIVE_GLOW = "rgba(37,99,235,0.25)";
 const CAL_BG = "#FFFFFF";
 const CAL_ALT_BG = "#F7F7F8";
 
-interface CalendarEntry {
+export interface CalendarEntry {
   id: string;
   client_page_id: string;
   client_name: string;
@@ -35,7 +36,7 @@ interface CalendarEntry {
   publish_error: string | null;
 }
 
-const STATUS_STYLES: Record<string, { label: string; color: string; bg: string }> = {
+export const STATUS_STYLES: Record<string, { label: string; color: string; bg: string }> = {
   draft:      { label: "Draft",     color: "#6B7280", bg: "#6B7280" },
   in_review:  { label: "In Review", color: "#D97706", bg: "#D97706" },
   approved:   { label: "Approved",  color: "#16A34A", bg: "#16A34A" },
@@ -358,21 +359,6 @@ export default function ContentCalendar() {
   );
 }
 
-// Warm gradient placeholders shown when an entry has no custom thumbnail image, picked
-// deterministically per entry so the same card always gets the same color.
-const THUMB_GRADIENTS = [
-  "linear-gradient(160deg, #6B4A32, #B98A5E)",
-  "linear-gradient(160deg, #8A5A34, #D9A066)",
-  "linear-gradient(160deg, #C98A4B, #EFC48C)",
-  "linear-gradient(160deg, #4A6B5A, #8FBFA3)",
-  "linear-gradient(160deg, #5A4A6B, #A98FBF)",
-  "linear-gradient(160deg, #6B5A4A, #D9BF8F)",
-];
-function thumbGradient(id: string) {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return THUMB_GRADIENTS[hash % THUMB_GRADIENTS.length];
-}
 
 function WeekView({ weekDays, entries, dragOverKey, setDragOverKey, onDrop, onSelect, onAddAt }: {
   weekDays: Date[];
@@ -471,7 +457,7 @@ function WeekView({ weekDays, entries, dragOverKey, setDragOverKey, onDrop, onSe
   );
 }
 
-function EntryDetailModal({ entry, onClose, onChanged }: {
+export function EntryDetailModal({ entry, onClose, onChanged }: {
   entry: CalendarEntry;
   onClose: () => void;
   onChanged: () => void;
