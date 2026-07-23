@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -6,6 +7,9 @@ export const runtime = "nodejs";
 const BUCKET = "cms-thumbnails";
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB — Reel cover images are small stills, not video.
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+// Meta recommends 1080x1920 (9:16) for Reels covers. We cap the longest edge instead of
+// force-cropping to that ratio, since covers can legitimately come in other aspect ratios.
+const MAX_DIMENSION = 1920;
 
 function getEnv() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -28,17 +32,25 @@ export async function POST(req: NextRequest) {
     if (!ALLOWED_TYPES.has(file.type)) return NextResponse.json({ error: "Only JPEG, PNG, or WEBP images are supported" }, { status: 400 });
     if (file.size > MAX_BYTES) return NextResponse.json({ error: "Image must be under 8MB" }, { status: 400 });
 
-    const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-    const path = `${crypto.randomUUID()}.${ext}`;
+    // Downscale oversized covers (e.g. straight-off-camera stills) to Meta's recommended
+    // Reels cover dimensions and re-compress, so we're not shipping multi-MB images that
+    // may exceed what Meta's cover_url ingestion actually accepts.
+    const resized = await sharp(await file.arrayBuffer())
+      .rotate() // apply EXIF orientation before resizing, then strip metadata
+      .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+    const path = `${crypto.randomUUID()}.jpg`;
 
     const uploadRes = await fetch(`${url}/storage/v1/object/${BUCKET}/${path}`, {
       method: "POST",
       headers: {
         apikey: key,
         Authorization: `Bearer ${key}`,
-        "Content-Type": file.type,
+        "Content-Type": "image/jpeg",
       },
-      body: await file.arrayBuffer(),
+      body: resized,
     });
     if (!uploadRes.ok) return NextResponse.json({ error: await uploadRes.text() }, { status: 500 });
 
@@ -52,8 +64,8 @@ export async function POST(req: NextRequest) {
         file_name: file.name,
         storage_path: path,
         public_url: publicUrl,
-        content_type: file.type,
-        size_bytes: file.size,
+        content_type: "image/jpeg",
+        size_bytes: resized.byteLength,
       }),
     });
 

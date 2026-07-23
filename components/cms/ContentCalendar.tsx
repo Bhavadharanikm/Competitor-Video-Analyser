@@ -5,6 +5,7 @@ import { useCmsClient, type CmsClient as Client } from "./ClientContext";
 import { FacebookIcon, InstagramIcon, PlatformIcons } from "./PlatformIcons";
 import { thumbGradient } from "./thumbGradient";
 import CoverImageUpload from "./CoverImageUpload";
+import LivePreview from "./LivePreview";
 
 const ACTIVE_COLOR = "#2563EB";
 const ACTIVE_GLOW = "rgba(37,99,235,0.25)";
@@ -550,15 +551,18 @@ export function EntryDetailModal({ entry, onClose, onChanged }: {
   const inputStyle = { background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" };
   const needsFb = entry.platform === "both" || entry.platform === "facebook";
   const needsIg = entry.platform === "both" || entry.platform === "instagram";
+  const previewThumb = customThumbnailUrl.trim() || mediaUrl.trim();
+  const handle = entry.client_name.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-6" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)" }} onClick={onClose}>
-      <div className="w-full max-w-md rounded-3xl p-7 flex flex-col gap-4" style={{ background: "var(--surface)", border: "1px solid var(--border)", maxHeight: "88vh" }} onClick={e => e.stopPropagation()}>
+      <div className="w-full max-w-5xl rounded-3xl p-7 flex flex-col gap-4" style={{ background: "var(--surface)", border: "1px solid var(--border)", maxHeight: "90vh" }} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between flex-shrink-0">
           <p className="text-[16px] font-bold" style={{ color: "var(--text)" }}>{entry.client_name}</p>
           <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer flex-shrink-0" style={{ background: "var(--bg)", color: "var(--muted)" }}>✕</button>
         </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 overflow-hidden flex-1 min-h-0">
         <div className="flex flex-col gap-4 overflow-y-auto pr-1">
           <div className="flex flex-col gap-1.5 text-[12px] rounded-[8px] px-3 py-2.5" style={{ background: "var(--bg)", color: "var(--muted)" }}>
             {needsFb && <p>Facebook: {entry.fb_published ? `✓ posted (${entry.fb_post_id})` : "not yet posted"}</p>}
@@ -675,28 +679,33 @@ export function EntryDetailModal({ entry, onClose, onChanged }: {
           </div>
 
           {error && <p className="text-[12px]" style={{ color: "#EF4444" }}>{error}</p>}
+
+          <div className="flex gap-2 flex-shrink-0 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+            <button
+              onClick={remove}
+              disabled={saving}
+              className="px-4 py-2.5 rounded-[10px] text-[12px] font-semibold cursor-pointer disabled:opacity-40"
+              style={{ border: "1px solid var(--border)", color: "#EF4444", background: "none" }}
+            >Delete</button>
+            <button
+              onClick={() => save(false)}
+              disabled={saving || !title.trim()}
+              className="flex-1 py-2.5 rounded-[10px] text-[12px] font-semibold cursor-pointer disabled:opacity-40"
+              style={{ border: "1px solid var(--border)", color: "var(--text)", background: "none" }}
+            >Save</button>
+            <button
+              onClick={() => save(true)}
+              disabled={saving || !title.trim() || status !== "approved"}
+              className="flex-1 py-2.5 rounded-[10px] text-[12px] font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: ACTIVE_COLOR, color: "#fff", border: "none" }}
+              title={status !== "approved" ? "Set status to Approved to enable publishing" : undefined}
+            >{saving ? "Working…" : "Save & Publish"}</button>
+          </div>
         </div>
 
-        <div className="flex gap-2 flex-shrink-0">
-          <button
-            onClick={remove}
-            disabled={saving}
-            className="px-4 py-2.5 rounded-[10px] text-[12px] font-semibold cursor-pointer disabled:opacity-40"
-            style={{ border: "1px solid var(--border)", color: "#EF4444", background: "none" }}
-          >Delete</button>
-          <button
-            onClick={() => save(false)}
-            disabled={saving || !title.trim()}
-            className="flex-1 py-2.5 rounded-[10px] text-[12px] font-semibold cursor-pointer disabled:opacity-40"
-            style={{ border: "1px solid var(--border)", color: "var(--text)", background: "none" }}
-          >Save</button>
-          <button
-            onClick={() => save(true)}
-            disabled={saving || !title.trim() || status !== "approved"}
-            className="flex-1 py-2.5 rounded-[10px] text-[12px] font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: ACTIVE_COLOR, color: "#fff", border: "none" }}
-            title={status !== "approved" ? "Set status to Approved to enable publishing" : undefined}
-          >{saving ? "Working…" : "Save & Publish"}</button>
+        <div className="lg:sticky lg:top-0 overflow-y-auto">
+          <LivePreview contentType={contentType} handle={handle} caption={caption} mediaUrl={previewThumb} coverUrl={coverUrl} />
+        </div>
         </div>
       </div>
     </div>
