@@ -5,6 +5,7 @@ import { useCmsClient } from "@/components/cms/ClientContext";
 import { FacebookIcon, InstagramIcon } from "@/components/cms/PlatformIcons";
 import { thumbGradient } from "@/components/cms/thumbGradient";
 import DriveMediaPreview from "@/components/cms/DriveMediaPreview";
+import CoverImageUpload from "@/components/cms/CoverImageUpload";
 
 const ACTIVE_COLOR = "#2563EB";
 const CAPTION_LIMIT = 2200;
@@ -30,6 +31,7 @@ export default function ComposePage() {
   const [caption, setCaption] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
   const [customThumbnailUrl, setCustomThumbnailUrl] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
   const [thumbOffsetSeconds, setThumbOffsetSeconds] = useState("");
   const [locationId, setLocationId] = useState("");
   const [userTags, setUserTags] = useState("");
@@ -70,6 +72,7 @@ export default function ComposePage() {
           scheduled_at: new Date(`${date}T${time}:00`).toISOString(),
           link_url: includeFacebook && !isStory ? (linkUrl.trim() || null) : null,
           custom_thumbnail_url: includeFacebook && !isStory ? (customThumbnailUrl.trim() || null) : null,
+          cover_url: includeInstagram && isReel ? (coverUrl.trim() || null) : null,
           thumb_offset_seconds: includeInstagram && !isStory && thumbOffsetSeconds ? Number(thumbOffsetSeconds) : null,
           location_id: includeInstagram && !isStory ? (locationId.trim() || null) : null,
           user_tags: includeInstagram && !isStory ? (userTags.trim() || null) : null,
@@ -199,8 +202,16 @@ export default function ComposePage() {
           {includeInstagram && !isStory && (
             <div className="flex flex-col gap-3 rounded-[10px] px-4 py-4" style={{ background: "var(--bg)" }}>
               <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "#E1306C" }}>Instagram options</p>
+              {isReel && (
+                <div>
+                  <p className="text-[11px] font-semibold mb-1.5" style={{ color: "var(--muted)" }}>Cover image (Reels only)</p>
+                  <CoverImageUpload value={coverUrl} onChange={setCoverUrl} clientPageId={clientPageId} inputStyle={inputStyle} />
+                </div>
+              )}
               <div>
-                <p className="text-[11px] font-semibold mb-1.5" style={{ color: "var(--muted)" }}>Thumbnail frame offset (seconds)</p>
+                <p className="text-[11px] font-semibold mb-1.5" style={{ color: "var(--muted)" }}>
+                  Thumbnail frame offset (seconds){isReel && coverUrl.trim() ? " — ignored while a cover image is set" : ""}
+                </p>
                 <input type="number" min="0" step="0.1" value={thumbOffsetSeconds} onChange={e => setThumbOffsetSeconds(e.target.value)} placeholder="e.g. 2.5" className="w-full rounded-[8px] px-3 py-2 text-[13px] outline-none" style={inputStyle} />
               </div>
               <div>
@@ -288,7 +299,7 @@ export default function ComposePage() {
           {contentType === "reel" && (
             <div className="relative rounded-[20px] overflow-hidden mx-auto w-full max-w-[280px] aspect-[9/16]" style={{ background: "#1a1a1a" }}>
               <DriveMediaPreview
-                url={previewThumb}
+                url={coverUrl.trim() || previewThumb}
                 className="absolute inset-0 w-full h-full object-cover"
                 fallback={<div className="absolute inset-0" style={previewThumb ? { background: thumbGradient(previewThumb) } : undefined} />}
               />

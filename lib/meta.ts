@@ -16,6 +16,7 @@ export interface CalendarEntry {
   scheduled_at: string;
   link_url: string | null;
   custom_thumbnail_url: string | null;
+  cover_url: string | null;
   thumb_offset_seconds: number | null;
   location_id: string | null;
   user_tags: string | null;
@@ -157,6 +158,8 @@ export async function publishToInstagram(
       params.media_type = "REELS";
       if (resolvedMediaUrl) params.video_url = resolvedMediaUrl;
       if (entry.caption) params.caption = entry.caption;
+      // Meta uses cover_url over thumb_offset when both are present, so it's safe to send both.
+      if (entry.cover_url) params.cover_url = entry.cover_url;
       if (entry.thumb_offset_seconds) params.thumb_offset = String(Math.round(entry.thumb_offset_seconds * 1000));
       params.share_to_feed = entry.share_to_feed ? "true" : "false";
     } else {
@@ -164,6 +167,7 @@ export async function publishToInstagram(
         params.media_type = "REELS";
         params.video_url = resolvedMediaUrl;
         params.share_to_feed = "true";
+        if (entry.cover_url) params.cover_url = entry.cover_url;
       } else if (resolvedMediaUrl) {
         params.image_url = resolvedMediaUrl;
       }

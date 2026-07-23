@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCmsClient, type CmsClient as Client } from "./ClientContext";
 import { FacebookIcon, InstagramIcon, PlatformIcons } from "./PlatformIcons";
 import { thumbGradient } from "./thumbGradient";
+import CoverImageUpload from "./CoverImageUpload";
 
 const ACTIVE_COLOR = "#2563EB";
 const ACTIVE_GLOW = "rgba(37,99,235,0.25)";
@@ -24,6 +25,7 @@ export interface CalendarEntry {
   scheduled_at: string;
   link_url: string | null;
   custom_thumbnail_url: string | null;
+  cover_url: string | null;
   thumb_offset_seconds: number | null;
   location_id: string | null;
   user_tags: string | null;
@@ -475,6 +477,7 @@ export function EntryDetailModal({ entry, onClose, onChanged }: {
   const [time, setTime] = useState(`${pad(scheduled.getHours())}:${pad(scheduled.getMinutes())}`);
   const [linkUrl, setLinkUrl] = useState(entry.link_url ?? "");
   const [customThumbnailUrl, setCustomThumbnailUrl] = useState(entry.custom_thumbnail_url ?? "");
+  const [coverUrl, setCoverUrl] = useState(entry.cover_url ?? "");
   const [thumbOffsetSeconds, setThumbOffsetSeconds] = useState(entry.thumb_offset_seconds != null ? String(entry.thumb_offset_seconds) : "");
   const [locationId, setLocationId] = useState(entry.location_id ?? "");
   const [userTags, setUserTags] = useState(entry.user_tags ?? "");
@@ -498,6 +501,7 @@ export function EntryDetailModal({ entry, onClose, onChanged }: {
     scheduled_at: new Date(`${date}T${time}:00`).toISOString(),
     link_url: includesFacebook && !isStory ? (linkUrl.trim() || null) : null,
     custom_thumbnail_url: includesFacebook && !isStory ? (customThumbnailUrl.trim() || null) : null,
+    cover_url: includesInstagram && isReel ? (coverUrl.trim() || null) : null,
     thumb_offset_seconds: includesInstagram && !isStory && thumbOffsetSeconds ? Number(thumbOffsetSeconds) : null,
     location_id: includesInstagram && !isStory ? (locationId.trim() || null) : null,
     user_tags: includesInstagram && !isStory ? (userTags.trim() || null) : null,
@@ -618,8 +622,14 @@ export function EntryDetailModal({ entry, onClose, onChanged }: {
           {includesInstagram && !isStory && (
             <div className="flex flex-col gap-3 rounded-[10px] px-3 py-3" style={{ background: "var(--bg)" }}>
               <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "#E1306C" }}>Instagram options</p>
+              {isReel && (
+                <div>
+                  <p className="text-[11px] font-semibold mb-1.5" style={{ color: "var(--muted)" }}>Cover image (Reels only)</p>
+                  <CoverImageUpload value={coverUrl} onChange={setCoverUrl} clientPageId={entry.client_page_id} inputStyle={inputStyle} />
+                </div>
+              )}
               <div>
-                <p className="text-[11px] font-semibold mb-1.5" style={{ color: "var(--muted)" }}>Thumbnail frame offset (seconds)</p>
+                <p className="text-[11px] font-semibold mb-1.5" style={{ color: "var(--muted)" }}>Thumbnail frame offset (seconds){isReel && coverUrl.trim() ? " — ignored while a cover image is set" : ""}</p>
                 <input type="number" min="0" step="0.1" value={thumbOffsetSeconds} onChange={e => setThumbOffsetSeconds(e.target.value)} className="w-full rounded-[8px] px-3 py-2 text-[13px] outline-none" style={inputStyle} />
               </div>
               <div>
@@ -711,6 +721,7 @@ function AddEntryModal({ date, defaultTime, clients, defaultClientPageId, onClos
   const [time, setTime] = useState(defaultTime ?? "09:00");
   const [linkUrl, setLinkUrl] = useState("");
   const [customThumbnailUrl, setCustomThumbnailUrl] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
   const [thumbOffsetSeconds, setThumbOffsetSeconds] = useState("");
   const [locationId, setLocationId] = useState("");
   const [userTags, setUserTags] = useState("");
@@ -746,6 +757,7 @@ function AddEntryModal({ date, defaultTime, clients, defaultClientPageId, onClos
           scheduled_at: new Date(`${date}T${time}:00`).toISOString(),
           link_url: includesFacebook && !isStory ? (linkUrl.trim() || null) : null,
           custom_thumbnail_url: includesFacebook && !isStory ? (customThumbnailUrl.trim() || null) : null,
+          cover_url: includesInstagram && isReel ? (coverUrl.trim() || null) : null,
           thumb_offset_seconds: includesInstagram && !isStory && thumbOffsetSeconds ? Number(thumbOffsetSeconds) : null,
           location_id: includesInstagram && !isStory ? (locationId.trim() || null) : null,
           user_tags: includesInstagram && !isStory ? (userTags.trim() || null) : null,
@@ -842,8 +854,14 @@ function AddEntryModal({ date, defaultTime, clients, defaultClientPageId, onClos
         {includesInstagram && !isStory && (
           <div className="flex flex-col gap-3 rounded-[10px] px-3 py-3" style={{ background: "var(--bg)" }}>
             <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "#E1306C" }}>Instagram options</p>
+            {isReel && (
+              <div>
+                <p className="text-[11px] font-semibold mb-1.5" style={{ color: "var(--muted)" }}>Cover image (Reels only, optional)</p>
+                <CoverImageUpload value={coverUrl} onChange={setCoverUrl} clientPageId={clientPageId} inputStyle={inputStyle} />
+              </div>
+            )}
             <div>
-              <p className="text-[11px] font-semibold mb-1.5" style={{ color: "var(--muted)" }}>Thumbnail frame offset — seconds into video (optional)</p>
+              <p className="text-[11px] font-semibold mb-1.5" style={{ color: "var(--muted)" }}>Thumbnail frame offset — seconds into video (optional){isReel && coverUrl.trim() ? " — ignored while a cover image is set" : ""}</p>
               <input type="number" min="0" step="0.1" value={thumbOffsetSeconds} onChange={e => setThumbOffsetSeconds(e.target.value)} placeholder="e.g. 2.5" className="w-full rounded-[8px] px-3 py-2 text-[13px] outline-none" style={inputStyle} />
             </div>
             <div>
