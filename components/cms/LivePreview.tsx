@@ -62,13 +62,13 @@ export default function LivePreview({ contentType, handle, caption, mediaUrl, co
             className="absolute inset-0 w-full h-full object-cover"
             fallback={<div className="absolute inset-0" style={previewThumb ? { background: thumbGradient(previewThumb) } : undefined} />}
           />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, transparent 20%, transparent 60%, rgba(0,0,0,0.65) 100%)" }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, transparent 20%, transparent 60%, rgba(0,0,0,0.65) 100%)" }} />
 
-          <div className="absolute top-3 left-3 text-[12px] font-bold text-white flex items-center gap-1.5">
+          <div className="absolute top-3 left-3 text-[12px] font-bold text-white flex items-center gap-1.5 pointer-events-none">
             <span style={{ fontSize: 15 }}>▶</span> Reels
           </div>
 
-          <div className="absolute right-2.5 bottom-16 flex flex-col items-center gap-4 text-white">
+          <div className="absolute right-2.5 bottom-16 flex flex-col items-center gap-4 text-white pointer-events-none">
             <div className="flex flex-col items-center gap-0.5"><span className="text-[22px]">♡</span><span className="text-[11px] font-semibold">0</span></div>
             <div className="flex flex-col items-center gap-0.5"><span className="text-[20px]">💬</span><span className="text-[11px] font-semibold">0</span></div>
             <div className="flex flex-col items-center gap-0.5"><span className="text-[20px]">➤</span></div>
@@ -76,7 +76,7 @@ export default function LivePreview({ contentType, handle, caption, mediaUrl, co
             <div className="w-6 h-6 rounded-[6px] mt-1" style={{ background: "rgba(255,255,255,0.25)", border: "1.5px solid #fff" }} />
           </div>
 
-          <div className="absolute left-3 right-14 bottom-3 text-white">
+          <div className="absolute left-3 right-14 bottom-3 text-white pointer-events-none">
             <div className="flex items-center gap-1.5 mb-1.5">
               <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{ background: ACTIVE_COLOR }}>
                 {avatarLetter}
@@ -100,13 +100,13 @@ export default function LivePreview({ contentType, handle, caption, mediaUrl, co
             className="absolute inset-0 w-full h-full object-cover"
             fallback={<div className="absolute inset-0" style={previewThumb ? { background: thumbGradient(previewThumb) } : undefined} />}
           />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 25%, transparent 80%, rgba(0,0,0,0.25) 100%)" }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 25%, transparent 80%, rgba(0,0,0,0.25) 100%)" }} />
 
-          <div className="absolute top-2 left-2 right-2 flex gap-1">
+          <div className="absolute top-2 left-2 right-2 flex gap-1 pointer-events-none">
             <div className="flex-1 h-[2.5px] rounded-full" style={{ background: "rgba(255,255,255,0.9)" }} />
           </div>
 
-          <div className="absolute top-5 left-3 right-3 flex items-center gap-2 text-white">
+          <div className="absolute top-5 left-3 right-3 flex items-center gap-2 text-white pointer-events-none">
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: ACTIVE_COLOR, border: "1.5px solid #fff" }}>
               {avatarLetter}
             </div>
@@ -115,7 +115,7 @@ export default function LivePreview({ contentType, handle, caption, mediaUrl, co
             <span className="text-[16px] ml-1">✕</span>
           </div>
 
-          <div className="absolute left-0 right-0 bottom-4 text-center text-[11px]" style={{ color: "rgba(255,255,255,0.75)" }}>
+          <div className="absolute left-0 right-0 bottom-4 text-center text-[11px] pointer-events-none" style={{ color: "rgba(255,255,255,0.75)" }}>
             Stories can&rsquo;t carry a caption via the API — only the photo/video posts.
           </div>
         </div>
