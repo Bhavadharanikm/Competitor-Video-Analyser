@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { getDueApprovedEntries } from "@/lib/cmsSupabase";
 import { publishEntry } from "@/lib/publishEntry";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const hashPrefix = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 8);
 
 // GET /api/cms/cron/publish-due — runs on a schedule (see vercel.json).
 // Catches Instagram posts whose scheduled time has arrived (Instagram has no native
@@ -12,8 +15,24 @@ export const maxDuration = 60;
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
-    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const expected = process.env.CRON_SECRET ? `Bearer ${process.env.CRON_SECRET}` : null;
+    if (expected && authHeader !== expected) {
+      // Diagnostic-only fields — one-way hash prefixes and lengths, never the actual
+      // secret — so we can tell a caller (e.g. cron-job.org's response viewer) exactly
+      // what's mismatching (whitespace, missing "Bearer ", wrong value entirely) without
+      // ever exposing CRON_SECRET itself.
+      return NextResponse.json({
+        error: "Unauthorized",
+        diagnostic: {
+          headerPresent: authHeader != null,
+          receivedLength: authHeader?.length ?? null,
+          expectedLength: expected.length,
+          startsWithBearer: authHeader?.startsWith("Bearer ") ?? false,
+          trimmedMatches: authHeader?.trim() === expected,
+          receivedHashPrefix: authHeader ? hashPrefix(authHeader) : null,
+          expectedHashPrefix: hashPrefix(expected),
+        },
+      }, { status: 401 });
     }
 
     const due = await getDueApprovedEntries(new Date().toISOString());
