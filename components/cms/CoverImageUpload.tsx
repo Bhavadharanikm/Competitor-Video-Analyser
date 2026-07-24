@@ -8,6 +8,34 @@ interface Props {
   inputStyle: React.CSSProperties;
 }
 
+const MAX_DIMENSION = 1920;
+
+/**
+ * Downscales the image in the browser before it ever leaves the device — phone camera
+ * photos can be 10MB+, well past Vercel's serverless request body limit (~4.5MB), which
+ * rejects the upload at the platform level with a plain-text "Request Entity Too Large"
+ * response our JSON parser then chokes on. Shrinking client-side keeps the upload small
+ * regardless of the original file size (the server still re-compresses it again via sharp).
+ */
+async function downscaleImage(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+  if (scale === 1 && file.size < 4 * 1024 * 1024) return file; // already small enough
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+  const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", 0.85));
+  if (!blob) return file;
+  return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
+}
+
 /**
  * Upload control for an Instagram Reel cover image — uploads to Supabase Storage via
  * /api/cms/upload-thumbnail and fills the resulting public URL into cover_url, which
@@ -18,17 +46,24 @@ export default function CoverImageUpload({ value, onChange, clientPageId, inputS
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFile = async (file: File) => {
+  const handleFile = async (rawFile: File) => {
     setUploading(true);
     setError(null);
     try {
+      const file = await downscaleImage(rawFile);
       const form = new FormData();
       form.append("file", file);
       if (clientPageId) form.append("client_page_id", clientPageId);
       const res = await fetch("/api/cms/upload-thumbnail", { method: "POST", body: form });
-      const data = await res.json();
+      const text = await res.text();
+      let data: { url?: string; error?: string };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(res.status === 413 ? "Image is too large — try a smaller photo." : "Upload failed unexpectedly.");
+      }
       if (!res.ok) throw new Error(data.error || "Upload failed");
-      onChange(data.url);
+      onChange(data.url!);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
