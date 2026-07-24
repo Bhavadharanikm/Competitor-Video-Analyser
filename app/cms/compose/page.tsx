@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCmsClient } from "@/components/cms/ClientContext";
 import { FacebookIcon, InstagramIcon } from "@/components/cms/PlatformIcons";
 import { thumbGradient } from "@/components/cms/thumbGradient";
@@ -15,15 +15,19 @@ function pad(n: number) { return String(n).padStart(2, "0"); }
 
 export default function ComposePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const dateParam = searchParams.get("date");
+  const clientParam = searchParams.get("client");
   const { sortedClients, selectedClientPageId } = useCmsClient();
 
-  const [clientPageId, setClientPageId] = useState(selectedClientPageId);
+  const [clientPageId, setClientPageId] = useState(clientParam || selectedClientPageId);
   const client = sortedClients.find(c => c.page_id === clientPageId) ?? null;
 
   // The client list loads asynchronously in ClientContext, so the initial useState value
-  // above is often still "" on first render — sync once it's actually populated.
+  // above is often still "" on first render — sync once it's actually populated (unless
+  // a specific client was requested via ?client=, e.g. from clicking a day on the calendar).
   useEffect(() => {
-    if (!clientPageId && selectedClientPageId) setClientPageId(selectedClientPageId);
+    if (!clientPageId && !clientParam && selectedClientPageId) setClientPageId(selectedClientPageId);
   }, [selectedClientPageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [includeInstagram, setIncludeInstagram] = useState(true);
@@ -41,19 +45,19 @@ export default function ComposePage() {
   const [linkUrl, setLinkUrl] = useState("");
 
   const now = useMemo(() => new Date(), []);
-  const [date, setDate] = useState(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`);
+  const [date, setDate] = useState(dateParam || `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`);
   const [time, setTime] = useState("09:00");
 
-  const [saving, setSaving] = useState<"approve" | "review" | null>(null);
+  const [saving, setSaving] = useState<"approve" | "review" | "draft" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const isStory = contentType === "story";
   const isReel = contentType === "reel";
   const platform = includeInstagram && includeFacebook ? "both" : includeInstagram ? "instagram" : includeFacebook ? "facebook" : "";
 
-  const submit = async (status: "in_review" | "approved") => {
+  const submit = async (status: "draft" | "in_review" | "approved") => {
     if (!platform || !clientPageId) return;
-    setSaving(status === "approved" ? "approve" : "review");
+    setSaving(status === "approved" ? "approve" : status === "in_review" ? "review" : "draft");
     setError(null);
     try {
       const title = caption.trim().slice(0, 60) || "Untitled post";
@@ -249,7 +253,13 @@ export default function ComposePage() {
 
           {error && <p className="text-[12px]" style={{ color: "#EF4444" }}>{error}</p>}
 
-          <div className="flex items-center gap-3 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+          <div className="flex items-center gap-3 pt-2 flex-wrap" style={{ borderTop: "1px solid var(--border)" }}>
+            <button
+              onClick={() => submit("draft")}
+              disabled={!!saving || !platform || !clientPageId}
+              className="px-5 py-2.5 rounded-[10px] text-[13px] font-semibold cursor-pointer disabled:opacity-40"
+              style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "none" }}
+            >{saving === "draft" ? "Saving…" : "Save as draft"}</button>
             <button
               onClick={() => submit("in_review")}
               disabled={!!saving || !platform || !clientPageId}
