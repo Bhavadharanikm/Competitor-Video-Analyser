@@ -15,8 +15,13 @@ const hashPrefix = (s: string) => createHash("sha256").update(s).digest("hex").s
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
-    const expected = process.env.CRON_SECRET ? `Bearer ${process.env.CRON_SECRET}` : null;
-    if (expected && authHeader !== expected) {
+    const secret = process.env.CRON_SECRET ?? null;
+    const expected = secret ? `Bearer ${secret}` : null;
+    // Some cron schedulers (confirmed: cron-job.org) strip the "Bearer " prefix from a
+    // custom Authorization header value before sending it, even when you type the full
+    // "Bearer <token>" string in — so we accept either form rather than fight that.
+    const authOk = !secret || authHeader === expected || authHeader === secret;
+    if (!authOk && expected) {
       // Diagnostic-only fields — one-way hash prefixes and lengths, never the actual
       // secret — so we can tell a caller (e.g. cron-job.org's response viewer) exactly
       // what's mismatching (whitespace, missing "Bearer ", wrong value entirely) without
