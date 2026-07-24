@@ -78,7 +78,7 @@ export default function ContentCalendar() {
   // "+ New post" in the sidebar links here with ?new=1 to open today's Add Entry modal directly.
   useEffect(() => {
     if (searchParams.get("new") === "1") {
-      setAddDate(new Date().toISOString().slice(0, 10));
+      setAddDate(dateKey(new Date()));
       setAddHour(null);
       setShowAdd(true);
       router.replace("/cms/calendar");
@@ -139,22 +139,25 @@ export default function ContentCalendar() {
 
   useEffect(() => { fetchEntries(); }, [cursor, view, selectedClientPageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Local calendar day (not UTC) — using toISOString() here would show the wrong day
+  // as "today" (and misfile entries by day) any time local time and UTC fall on
+  // different calendar dates, e.g. evening in any timezone behind UTC.
+  const dateKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
   const entriesByDay = useMemo(() => {
     const map: Record<string, CalendarEntry[]> = {};
     for (const e of entries) {
-      const key = e.scheduled_at.slice(0, 10);
+      const key = dateKey(new Date(e.scheduled_at));
       if (!map[key]) map[key] = [];
       map[key].push(e);
     }
     return map;
   }, [entries]);
 
-  const dateKey = (d: Date) => d.toISOString().slice(0, 10);
-
   const volumeByDay = useMemo(() => {
     const map: Record<string, number> = {};
     for (const e of entries) {
-      const key = e.scheduled_at.slice(0, 10);
+      const key = dateKey(new Date(e.scheduled_at));
       map[key] = (map[key] ?? 0) + 1;
     }
     return map;
@@ -372,7 +375,8 @@ function WeekView({ weekDays, entries, dragOverKey, setDragOverKey, onDrop, onSe
   onSelect: (entry: CalendarEntry) => void;
   onAddAt: (date: Date) => void;
 }) {
-  const dateKey = (d: Date) => d.toISOString().slice(0, 10);
+  // Local calendar day (not UTC) — see the equivalent comment in the parent component.
+  const dateKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const today = dateKey(new Date());
 
   const entriesByDay = useMemo(() => {
