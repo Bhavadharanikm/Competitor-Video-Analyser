@@ -2,6 +2,26 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+// Specific property tags to hide from the dropdown for a given client — new
+// properties added later are unaffected and show up automatically.
+const HIDDEN_PROPERTIES: Record<string, string[]> = {
+  "Starlight Haven": [
+    "A-Frame - Contenthouse",
+    "Deer Run Treehouse - Contenthouse",
+    "Exclusive Glamping Tent",
+    "Firefly Ridge Treehouse - Contenthouse",
+    "Geodesic Domes",
+    "Geodesic Domes- Contenthouse",
+    "Hot Springs",
+    "Luxury Glamping Tent",
+    "Modern Cabins - Contenthouse",
+    "Modern Luxury Cabins",
+    "Sunrise Point Treehouse",
+    "Tents-contenthouse",
+    "Weiss Lake A-frame",
+  ],
+};
+
 // GET /api/properties — returns all properties grouped by client
 // { "FLOHOM": ["FLO15", "FLO16", ...], "Awayframes": [...] }
 export async function GET() {
@@ -43,7 +63,11 @@ export async function GET() {
       if (!grouped[client]) grouped[client] = [];
       if (!grouped[client].includes(tag)) grouped[client].push(tag);
     }
-    for (const key of Object.keys(grouped)) grouped[key].sort();
+    for (const key of Object.keys(grouped)) {
+      const hidden = HIDDEN_PROPERTIES[key];
+      if (hidden) grouped[key] = grouped[key].filter((p) => !hidden.includes(p));
+      grouped[key].sort();
+    }
 
     return NextResponse.json({ properties: grouped });
   } catch (err) {

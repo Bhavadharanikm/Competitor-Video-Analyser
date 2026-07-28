@@ -90,6 +90,7 @@ export default function UploadZone({ activeTab, onResult }: Props) {
   // Only track runs started in this session — switching client/tab starts fresh, no historical rows.
   useEffect(() => {
     setTrackedRuns([]);
+    if (historyPollRef.current) { clearInterval(historyPollRef.current); historyPollRef.current = null; }
   }, [activeTab, clientName]);
 
   const pollRun = async (runId: string): Promise<boolean> => {
@@ -105,6 +106,12 @@ export default function UploadZone({ activeTab, onResult }: Props) {
             : r
         )
       );
+      // n8n's webhook now responds immediately, so the real completion signal is
+      // this Reel_Jobs row — stop polling only once it actually reaches a terminal state.
+      if ((job.status === "completed" || job.status === "failed") && historyPollRef.current) {
+        clearInterval(historyPollRef.current);
+        historyPollRef.current = null;
+      }
       return true;
     } catch {
       return false;
@@ -191,27 +198,27 @@ export default function UploadZone({ activeTab, onResult }: Props) {
       if (!res.ok) throw new Error((await res.text()) || `Error ${res.status}`);
       const data = await res.json();
       setStep("done");
-      onResult(data, displayName);
-      if (newRunId) {
-        setTrackedRuns((prev) => prev.map((r) => (r.run_id === newRunId ? { ...r, status: "completed" } : r)));
+      // n8n's webhook for the client tab now responds immediately (before analysis
+      // finishes), so this payload is just an ack, not a result — real progress and
+      // completion come from the Reel_Jobs polling above instead.
+      if (activeTab !== "client") {
+        onResult(data, displayName);
       }
     } catch (err: unknown) {
       clearTimers();
       setStep("error");
       setErrMsg(err instanceof Error ? err.message : "Something went wrong.");
       if (newRunId) {
-        // Prefer the real error n8n wrote to Reel_Jobs; only fall back to a generic message if it wrote nothing.
-        const gotJob = await pollRun(newRunId);
         setTrackedRuns((prev) =>
           prev.map((r) =>
             r.run_id === newRunId
-              ? { ...r, status: "failed", message: gotJob ? r.message : "Analysis failed" }
+              ? { ...r, status: "failed", message: "Could not start analysis" }
               : r
           )
         );
+        if (historyPollRef.current) { clearInterval(historyPollRef.current); historyPollRef.current = null; }
       }
     } finally {
-      if (historyPollRef.current) { clearInterval(historyPollRef.current); historyPollRef.current = null; }
       setScanning(false);
     }
   };
@@ -588,7 +595,9 @@ export default function UploadZone({ activeTab, onResult }: Props) {
                         border: `1px solid ${isDone ? "rgba(34,197,94,0.3)" : isFailed ? "rgba(239,68,68,0.2)" : activeColor}`,
                       }}
                     >
-                      {isDone ? "✓" : isFailed ? "✕" : "…"}
+                      {isDone ? "✓" : isFailed ? "✕" : (
+                        <span style={{ animation: "blink 1.4s ease-in-out infinite" }}>…</span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[12px] font-semibold truncate" style={{ color: "var(--text)" }}>{job.file_name || "Untitled clip"}</p>
