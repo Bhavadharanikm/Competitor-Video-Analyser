@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 const WEBHOOK_ONE_TEMPLATE       = "https://n8n.srv1597665.hstgr.cloud/webhook/Multiple-client";
 const WEBHOOK_MULTIPLE_TEMPLATES = "https://n8n.srv1597665.hstgr.cloud/webhook/Videoediting";
+// Testing currently shares the Multiple Templates workflow — change this one line to
+// point the Testing page at a separate test workflow without touching the live flows.
+const WEBHOOK_TESTING            = "https://n8n.srv1597665.hstgr.cloud/webhook/Videoediting";
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,7 +33,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const webhook = body.mode === "one_template" ? WEBHOOK_ONE_TEMPLATE : WEBHOOK_MULTIPLE_TEMPLATES;
+    // `flow` (not `mode`) selects the webhook, so the Testing page can be repointed
+    // without changing the `mode` value the n8n workflows already branch on.
+    const webhook =
+      body.mode === "one_template" ? WEBHOOK_ONE_TEMPLATE :
+      body.flow === "testing"      ? WEBHOOK_TESTING :
+                                     WEBHOOK_MULTIPLE_TEMPLATES;
     const res = await fetch(`${webhook}?${params.toString()}`, { method: "GET" });
 
     const text = await res.text();

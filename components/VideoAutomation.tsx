@@ -6,7 +6,7 @@ const ACTIVE_COLOR = "#2563EB";
 const ACTIVE_GLOW  = "rgba(37,99,235,0.25)";
 const CARD_BORDER  = "rgba(37,99,235,0.3)";
 
-type Mode = null | "one_template" | "multiple_templates";
+type Mode = null | "one_template" | "multiple_templates" | "testing";
 type Step = "idle" | "running" | "done" | "error";
 
 interface SheetRow { [key: string]: string; }
@@ -184,7 +184,9 @@ export default function VideoAutomation() {
   const running = step === "running";
   const selectedClientNames  = Object.keys(selectedClients);
   const selectedTemplateNames = Object.keys(selectedTemplates).filter(k => selectedTemplates[k]);
-  const videosToGenerate     = mode === "multiple_templates" ? selectedTemplateNames.length : selectedClientNames.length;
+  // "testing" is a replica of the Multiple Templates flow, so it counts templates the same way.
+  const isMultiTemplateMode  = mode === "multiple_templates" || mode === "testing";
+  const videosToGenerate     = isMultiTemplateMode ? selectedTemplateNames.length : selectedClientNames.length;
   const allMtStylesAssigned  = selectedTemplateNames.length > 0 && selectedTemplateNames.every(tKey => !!mtCreatomateStyles[tKey]);
 
   useEffect(() => {
@@ -322,6 +324,8 @@ export default function VideoAutomation() {
         : {
             run_id: newRunId,
             mode: "multiple_templates",
+            // Routes to the Testing webhook without altering `mode`, which n8n branches on.
+            ...(mode === "testing" ? { flow: "testing" } : {}),
             clientName: mtClient,
             property: mtProperty,
             templates: rows.filter(r => selectedTemplates[r[fileKey]]).map(r => {
@@ -441,6 +445,29 @@ export default function VideoAutomation() {
                 <div>
                   <p className="text-[15px] font-bold" style={{ color: "var(--text)" }}>Multiple Templates</p>
                   <p className="text-[12px] mt-0.5" style={{ color: "var(--muted)" }}>Run many templates for one client</p>
+                </div>
+              </div>
+              <span className="text-[18px]" style={{ color: "var(--muted)" }}>→</span>
+            </motion.button>
+
+            {/* Testing card — same flow as Multiple Templates, kept separate so it can be
+                pointed at a test workflow without touching the live one. */}
+            <motion.button
+              onClick={() => setMode("testing")}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              className="w-full flex items-center justify-between rounded-2xl px-6 py-5 cursor-pointer text-left"
+              style={{ background: "var(--surface)", border: "1.5px solid var(--border)", transition: "border-color 0.15s, box-shadow 0.15s" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = ACTIVE_COLOR; (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 20px ${ACTIVE_GLOW}`; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "none"; }}
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(37,99,235,0.1)", border: "1px solid rgba(37,99,235,0.2)" }}>
+                  <span style={{ fontSize: 20 }}>🧪</span>
+                </div>
+                <div>
+                  <p className="text-[15px] font-bold" style={{ color: "var(--text)" }}>Testing</p>
+                  <p className="text-[12px] mt-0.5" style={{ color: "var(--muted)" }}>Same as Multiple Templates, for test runs</p>
                 </div>
               </div>
               <span className="text-[18px]" style={{ color: "var(--muted)" }}>→</span>
@@ -824,8 +851,9 @@ export default function VideoAutomation() {
           </motion.div>
         )}
 
-        {/* ── MULTIPLE TEMPLATES FULL VIEW ── */}
-        {mode === "multiple_templates" && (
+        {/* ── MULTIPLE TEMPLATES / TESTING FULL VIEW ──
+             Both modes share this exact view so the Testing page can't drift from the real one. */}
+        {isMultiTemplateMode && (
           <motion.div
             key="multiple_templates"
             initial={pageIn}
@@ -937,10 +965,10 @@ export default function VideoAutomation() {
               <div className="flex flex-col gap-4 rounded-2xl p-6" style={{ background: "var(--surface)", border: `1.5px solid ${CARD_BORDER}`, boxShadow: `0 0 24px ${ACTIVE_GLOW}` }}>
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(37,99,235,0.1)", border: "1px solid rgba(37,99,235,0.2)" }}>
-                    <span style={{ color: ACTIVE_COLOR, fontSize: 16 }}>🎬</span>
+                    <span style={{ color: ACTIVE_COLOR, fontSize: 16 }}>{mode === "testing" ? "🧪" : "🎬"}</span>
                   </div>
                   <div>
-                    <p className="text-[14px] font-bold" style={{ color: "var(--text)" }}>Multiple Templates</p>
+                    <p className="text-[14px] font-bold" style={{ color: "var(--text)" }}>{mode === "testing" ? "Testing" : "Multiple Templates"}</p>
                     <p className="text-[11px]" style={{ color: "var(--muted)" }}>Many templates, one client.</p>
                   </div>
                 </div>
