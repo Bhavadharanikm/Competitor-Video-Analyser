@@ -176,6 +176,9 @@ export default function VideoAutomation() {
   const pollRef   = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [creatomateTemplates, setCreatomateTemplates] = useState<CreatomateTemplate[]>([]);
+  // Testing pulls its styles from a separate Creatomate account, so those never
+  // appear in One Template / Multiple Templates.
+  const [testingTemplates, setTestingTemplates] = useState<CreatomateTemplate[]>([]);
   const [selectedCreatomateId, setSelectedCreatomateId] = useState<string | null>(null);
   // MT needs one style per selected sheet-template, keyed by that template's row key.
   const [mtCreatomateStyles, setMtCreatomateStyles] = useState<Record<string, string>>({});
@@ -186,6 +189,8 @@ export default function VideoAutomation() {
   const selectedTemplateNames = Object.keys(selectedTemplates).filter(k => selectedTemplates[k]);
   // "testing" is a replica of the Multiple Templates flow, so it counts templates the same way.
   const isMultiTemplateMode  = mode === "multiple_templates" || mode === "testing";
+  // Every style picker reads this, so Testing only ever sees its own account's templates.
+  const galleryTemplates     = mode === "testing" ? testingTemplates : creatomateTemplates;
   const videosToGenerate     = isMultiTemplateMode ? selectedTemplateNames.length : selectedClientNames.length;
   const allMtStylesAssigned  = selectedTemplateNames.length > 0 && selectedTemplateNames.every(tKey => !!mtCreatomateStyles[tKey]);
 
@@ -233,7 +238,10 @@ export default function VideoAutomation() {
   useEffect(() => {
     fetch("/api/creatomate-templates")
       .then(r => r.json())
-      .then(data => setCreatomateTemplates(data.templates ?? []))
+      .then(data => {
+        setCreatomateTemplates(data.templates ?? []);
+        setTestingTemplates(data.testingTemplates ?? []);
+      })
       .catch(() => {});
   }, []);
 
@@ -309,7 +317,7 @@ export default function VideoAutomation() {
     setJobStatuses([]);
     setStep("running");
     setErrMsg(null);
-    const selectedCreatomateTemplate = creatomateTemplates.find(t => t.template_id === selectedCreatomateId) ?? null;
+    const selectedCreatomateTemplate = galleryTemplates.find(t => t.template_id === selectedCreatomateId) ?? null;
     const payload =
       mode === "one_template"
         ? {
@@ -329,7 +337,7 @@ export default function VideoAutomation() {
             clientName: mtClient,
             property: mtProperty,
             templates: rows.filter(r => selectedTemplates[r[fileKey]]).map(r => {
-              const style = creatomateTemplates.find(t => t.template_id === mtCreatomateStyles[r[fileKey]]) ?? null;
+              const style = galleryTemplates.find(t => t.template_id === mtCreatomateStyles[r[fileKey]]) ?? null;
               return {
                 ...r,
                 creatomate_template_id:   style?.template_id ?? null,
@@ -805,13 +813,13 @@ export default function VideoAutomation() {
             </div>
 
             {/* Creatomate template gallery — pick which render template this run uses */}
-            {creatomateTemplates.length > 0 && (
+            {galleryTemplates.length > 0 && (
               <div className="mt-6">
                 <p className="text-[11px] font-semibold tracking-widest uppercase mb-3" style={{ color: "var(--muted)" }}>
                   Template Styles
                 </p>
                 <div className="flex flex-wrap gap-3">
-                  {creatomateTemplates.map(t => {
+                  {galleryTemplates.map(t => {
                     const isSelected = selectedCreatomateId === t.template_id;
                     return (
                       <button
@@ -1005,7 +1013,7 @@ export default function VideoAutomation() {
                         const tKey = row[fileKey];
                         const checked = !!selectedTemplates[tKey];
                         const assignedId = mtCreatomateStyles[tKey];
-                        const assignedStyle = creatomateTemplates.find(t => t.template_id === assignedId) ?? null;
+                        const assignedStyle = galleryTemplates.find(t => t.template_id === assignedId) ?? null;
                         return (
                           <div key={i} className="rounded-[8px] transition-colors" style={{ background: checked ? "rgba(37,99,235,0.06)" : "transparent" }}>
                             <div
@@ -1027,7 +1035,7 @@ export default function VideoAutomation() {
                             </div>
 
                             {/* Inline Creatomate style picker — appears once this template is selected */}
-                            {checked && creatomateTemplates.length > 0 && (
+                            {checked && galleryTemplates.length > 0 && (
                               <div className="flex items-center gap-2 pl-11 pr-2 pb-2.5" onClick={e => e.stopPropagation()}>
                                 <select
                                   value={assignedId ?? ""}
@@ -1036,7 +1044,7 @@ export default function VideoAutomation() {
                                   style={{ background: "var(--bg)", border: `1px solid ${assignedId ? "var(--border)" : "#EF4444"}`, color: "var(--text)" }}
                                 >
                                   <option value="" disabled>Select a template style…</option>
-                                  {creatomateTemplates.map(t => (
+                                  {galleryTemplates.map(t => (
                                     <option key={t.template_id} value={t.template_id}>{t.template_name}</option>
                                   ))}
                                 </select>
@@ -1178,13 +1186,13 @@ export default function VideoAutomation() {
             </div>
 
             {/* Creatomate template gallery — pick which render template this run uses */}
-            {creatomateTemplates.length > 0 && (
+            {galleryTemplates.length > 0 && (
               <div className="mt-6">
                 <p className="text-[11px] font-semibold tracking-widest uppercase mb-3" style={{ color: "var(--muted)" }}>
                   Template Styles
                 </p>
                 <div className="flex flex-wrap gap-3">
-                  {creatomateTemplates.map(t => {
+                  {galleryTemplates.map(t => {
                     const isSelected = selectedCreatomateId === t.template_id;
                     return (
                       <button

@@ -2,6 +2,31 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+interface TemplateRow {
+  template_id: string;
+  template_name: string;
+  thumbnail_url: string | null;
+  video_element_name: string | null;
+  text_element_name: string | null;
+  updated_at: string;
+}
+
+/**
+ * Templates belonging to the separate Creatomate account used only by the
+ * Automation → Testing section. Listed explicitly rather than looked up from
+ * Creatomate, because that account's API key lives in n8n, not here — a live
+ * lookup would work locally and silently no-op in production.
+ *
+ * Anything listed here shows ONLY under Testing; everything else shows under
+ * One Template and Multiple Templates. Add a row here when a new template is
+ * added to the Testing account.
+ */
+const TESTING_TEMPLATE_IDS = new Set([
+  "40e91856-ed1f-4002-96bd-ace68ce27f25", // Blank template
+  "a0124e1f-83f4-4789-accd-419447743a85", // Gradient overlay
+  "e0104502-e42a-4fff-b4a6-dccf543261f4", // Storytelling Video
+]);
+
 export async function GET() {
   try {
     const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -31,8 +56,13 @@ export async function GET() {
       return NextResponse.json({ error: `Supabase error ${res.status}: ${text}` }, { status: 500 });
     }
 
-    const templates = await res.json();
-    return NextResponse.json({ templates });
+    const rows: TemplateRow[] = await res.json();
+    const isTesting = (r: TemplateRow) => TESTING_TEMPLATE_IDS.has(r.template_id);
+
+    return NextResponse.json({
+      templates:        rows.filter(r => !isTesting(r)),
+      testingTemplates: rows.filter(isTesting),
+    });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
