@@ -192,7 +192,12 @@ export default function VideoAutomation() {
   // Every style picker reads this, so Testing only ever sees its own account's templates.
   const galleryTemplates     = mode === "testing" ? testingTemplates : creatomateTemplates;
   const videosToGenerate     = isMultiTemplateMode ? selectedTemplateNames.length : selectedClientNames.length;
-  const allMtStylesAssigned  = selectedTemplateNames.length > 0 && selectedTemplateNames.every(tKey => !!mtCreatomateStyles[tKey]);
+  // Require the assigned style to still resolve in the current pool, not merely to
+  // be present — an id that no longer exists would submit as null and n8n would
+  // fail with "template not found".
+  const allMtStylesAssigned  = selectedTemplateNames.length > 0 && selectedTemplateNames.every(
+    tKey => galleryTemplates.some(t => t.template_id === mtCreatomateStyles[tKey])
+  );
 
   useEffect(() => {
     fetch("/api/sheet")
@@ -244,6 +249,16 @@ export default function VideoAutomation() {
       })
       .catch(() => {});
   }, []);
+
+  // Testing draws styles from a different Creatomate account than the other two
+  // modes, so a style picked in one mode is meaningless in another. Without this,
+  // stale ids survived the switch: the "all styles assigned" check still passed
+  // (the keys existed) while the lookup at submit time found nothing, and n8n was
+  // handed creatomate_template_id: null — "template not found".
+  useEffect(() => {
+    setSelectedCreatomateId(null);
+    setMtCreatomateStyles({});
+  }, [mode]);
 
   const toggleClient = (name: string) => {
     setSelectedClients(prev => {
