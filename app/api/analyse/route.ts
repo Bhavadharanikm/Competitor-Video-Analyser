@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// n8n's analysis workflow blocks this request until it fully finishes, which can take
-// well past Vercel's default 10s serverless timeout — hence FUNCTION_INVOCATION_TIMEOUT.
-// 60s is the max allowed on the Hobby plan; if analyses routinely run longer than that,
-// this needs to become fire-and-forget with the frontend relying solely on its existing
-// Reel_Jobs polling instead of this response.
-export const maxDuration = 60;
+// The "client" webhook now responds immediately (n8n keeps working in the background and
+// the frontend tracks progress via Reel_Jobs polling), so it needs almost no time here.
+// The "competitor" webhook is still fully synchronous: it converts the clip to MP3 via
+// CloudConvert and runs two sequential fal.ai/Gemini passes, with ~28s of hard-coded Wait
+// nodes before any polling. That lands around 55-75s, so a 60s cap failed it at random.
+export const maxDuration = 300;
 
 const WEBHOOKS: Record<string, string> = {
   competitor: "https://n8n.srv1597665.hstgr.cloud/webhook/instagram-analyser",
