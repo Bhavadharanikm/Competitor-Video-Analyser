@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 const WEBHOOK_ONE_TEMPLATE       = "https://n8n.srv1597665.hstgr.cloud/webhook/Multiple-client";
 const WEBHOOK_MULTIPLE_TEMPLATES = "https://n8n.srv1597665.hstgr.cloud/webhook/Videoediting";
-// Testing currently shares the Multiple Templates workflow — change this one line to
-// point the Testing page at a separate test workflow without touching the live flows.
-const WEBHOOK_TESTING            = "https://n8n.srv1597665.hstgr.cloud/webhook/Videoediting";
+// The Testing page runs its own n8n workflow, so test runs never touch the live one.
+const WEBHOOK_TESTING            = "https://n8n.srv1597665.hstgr.cloud/webhook/testingtemplate";
 
 export async function POST(req: NextRequest) {
   try {
