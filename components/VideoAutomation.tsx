@@ -122,12 +122,14 @@ function parseTimestampSegments(raw: string): TimestampSegment[] {
 }
 
 interface CreatomateTemplate {
-  template_id:        string;
-  template_name:      string;
-  thumbnail_url:       string | null;
-  video_element_name: string | null;
-  text_element_name:  string | null;
-  updated_at:          string;
+  template_id:          string;
+  template_name:        string;
+  thumbnail_url:         string | null;
+  video_element_name:   string | null;
+  text_element_name:    string | null;
+  // Optional secondary text element (e.g. a subtitle) — most templates only have one.
+  text_element_2_name:  string | null;
+  updated_at:            string;
 }
 
 function timeAgo(iso: string): string {
@@ -343,6 +345,7 @@ export default function VideoAutomation() {
             creatomate_template_id:    selectedCreatomateTemplate?.template_id ?? null,
             creatomate_video_element:  selectedCreatomateTemplate?.video_element_name ?? null,
             creatomate_text_element:   selectedCreatomateTemplate?.text_element_name ?? null,
+            creatomate_text_element_2: selectedCreatomateTemplate?.text_element_2_name ?? null,
           }
         : {
             run_id: newRunId,
@@ -358,6 +361,7 @@ export default function VideoAutomation() {
                 creatomate_template_id:   style?.template_id ?? null,
                 creatomate_video_element: style?.video_element_name ?? null,
                 creatomate_text_element:  style?.text_element_name ?? null,
+                creatomate_text_element_2: style?.text_element_2_name ?? null,
               };
             }),
             openingHook: mtHook,
