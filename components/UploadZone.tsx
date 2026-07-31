@@ -99,18 +99,32 @@ export default function UploadZone({ activeTab, onResult }: Props) {
       const data = await res.json();
       const job = (data.jobs ?? [])[0];
       if (!job) return false;
+      // n8n's "all clips done" node writes a different status string than the
+      // per-clip one — normalize once here so every consumer (tracking row icon,
+      // top stepper) only ever needs to check "completed"/"failed", regardless of
+      // which exact string n8n used for "fully finished".
+      const status = job.status === "All Clips Analysed" ? "completed" : job.status;
       setTrackedRuns((prev) =>
         prev.map((r) =>
           r.run_id === runId
-            ? { ...r, file_name: job.file_name || r.file_name, status: job.status, message: job.message, updated_at: job.updated_at }
+            ? { ...r, file_name: job.file_name || r.file_name, status, message: job.message, updated_at: job.updated_at }
             : r
         )
       );
       // n8n's webhook now responds immediately, so the real completion signal is
-      // this Reel_Jobs row — stop polling only once it actually reaches a terminal state.
-      if ((job.status === "completed" || job.status === "failed") && historyPollRef.current) {
-        clearInterval(historyPollRef.current);
-        historyPollRef.current = null;
+      // this Reel_Jobs row — stop polling, and only now finalize the top stepper
+      // and scan beam, once it actually reaches a terminal state. Finalizing them
+      // off the webhook's instant ack (as before) froze the stepper mid-run: "done"
+      // isn't in STEPS, so stepIndex became -1 and every step looked un-started.
+      if (status === "completed" || status === "failed") {
+        if (historyPollRef.current) {
+          clearInterval(historyPollRef.current);
+          historyPollRef.current = null;
+        }
+        clearTimers();
+        setScanning(false);
+        setStep(status === "completed" ? "done" : "error");
+        if (status === "failed") setErrMsg(job.message || "Analysis failed");
       }
       return true;
     } catch {
@@ -194,14 +208,16 @@ export default function UploadZone({ activeTab, onResult }: Props) {
             : {}),
         }),
       });
-      clearTimers();
-      if (!res.ok) throw new Error((await res.text()) || `Error ${res.status}`);
+      if (!res.ok) { clearTimers(); throw new Error((await res.text()) || `Error ${res.status}`); }
       const data = await res.json();
-      setStep("done");
       // n8n's webhook for the client tab now responds immediately (before analysis
-      // finishes), so this payload is just an ack, not a result — real progress and
-      // completion come from the Reel_Jobs polling above instead.
+      // finishes), so this payload is just an ack, not a result — the stepper, scan
+      // beam, and result all come from the Reel_Jobs polling above instead, once it
+      // reaches a terminal status. Finalizing them here (as before) froze the
+      // stepper mid-run, since the ack always arrived well before the real work did.
       if (activeTab !== "client") {
+        clearTimers();
+        setStep("done");
         onResult(data, displayName);
       }
     } catch (err: unknown) {
@@ -218,7 +234,6 @@ export default function UploadZone({ activeTab, onResult }: Props) {
         );
         if (historyPollRef.current) { clearInterval(historyPollRef.current); historyPollRef.current = null; }
       }
-    } finally {
       setScanning(false);
     }
   };
