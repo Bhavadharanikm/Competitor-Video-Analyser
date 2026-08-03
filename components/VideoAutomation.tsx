@@ -127,8 +127,9 @@ interface CreatomateTemplate {
   thumbnail_url:         string | null;
   video_element_name:   string | null;
   text_element_name:    string | null;
-  // Optional secondary text element (e.g. a subtitle) — most templates only have one.
+  // Optional secondary/caption text elements — most templates only have one text element.
   text_element_2_name:  string | null;
+  text_element_3_name:  string | null;
   updated_at:            string;
 }
 
@@ -346,6 +347,7 @@ export default function VideoAutomation() {
             creatomate_video_element:  selectedCreatomateTemplate?.video_element_name ?? null,
             creatomate_text_element:   selectedCreatomateTemplate?.text_element_name ?? null,
             creatomate_text_element_2: selectedCreatomateTemplate?.text_element_2_name ?? null,
+            creatomate_caption_element: selectedCreatomateTemplate?.text_element_3_name ?? null,
           }
         : {
             run_id: newRunId,
@@ -362,6 +364,7 @@ export default function VideoAutomation() {
                 creatomate_video_element: style?.video_element_name ?? null,
                 creatomate_text_element:  style?.text_element_name ?? null,
                 creatomate_text_element_2: style?.text_element_2_name ?? null,
+                creatomate_caption_element: style?.text_element_3_name ?? null,
               };
             }),
             openingHook: mtHook,

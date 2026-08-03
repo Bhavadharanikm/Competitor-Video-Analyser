@@ -8,8 +8,10 @@ interface TemplateRow {
   thumbnail_url: string | null;
   video_element_name: string | null;
   text_element_name: string | null;
-  // Optional secondary text element (e.g. a subtitle) — most templates only have one.
+  // Optional secondary/tertiary text elements (e.g. a subtitle, a second caption
+  // instance) — most templates only have one text element.
   text_element_2_name: string | null;
+  text_element_3_name: string | null;
   updated_at: string;
 }
 
@@ -39,7 +41,7 @@ export async function GET() {
     }
 
     const params = new URLSearchParams({
-      select: "template_name,template_id,thumbnail_url,video_element_name,text_element_name,text_element_2_name,updated_at",
+      select: "template_name,template_id,thumbnail_url,video_element_name,text_element_name,text_element_2_name,text_element_3_name,updated_at",
       order: "updated_at.desc",
     });
 
