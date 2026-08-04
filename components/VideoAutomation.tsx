@@ -856,10 +856,13 @@ export default function VideoAutomation() {
                 {errMsg && <p className="text-[11px]" style={{ color: "#EF4444" }}>{errMsg}</p>}
 
                 <div className="flex gap-2">
-                  <button onClick={handleSubmit} disabled={videosToGenerate === 0} className="w-full py-3 rounded-[10px] text-[12px] font-bold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed" style={{ background: ACTIVE_COLOR, color: "#fff", boxShadow: `0 0 16px ${ACTIVE_GLOW}`, border: "none" }}>
+                  <button onClick={handleSubmit} disabled={videosToGenerate === 0 || !selectedCreatomateId} className="w-full py-3 rounded-[10px] text-[12px] font-bold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed" style={{ background: ACTIVE_COLOR, color: "#fff", boxShadow: `0 0 16px ${ACTIVE_GLOW}`, border: "none" }}>
                     Run automation →
                   </button>
                 </div>
+                {videosToGenerate > 0 && !selectedCreatomateId && (
+                  <p className="text-[11px]" style={{ color: "#EF4444" }}>Pick a template style below before running.</p>
+                )}
               </div>
 
             </div>
