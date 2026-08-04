@@ -12,10 +12,11 @@ type Step = "idle" | "running" | "done" | "error";
 interface SheetRow { [key: string]: string; }
 
 interface ClientEntry {
-  property:    string;
-  openingHook: string;
-  cta:         string;
-  comment:     string;
+  property:              string;
+  openingHook:           string;
+  cta:                   string;
+  comment:               string;
+  creatomateTemplateId:  string;
 }
 
 interface ReelJob {
@@ -195,7 +196,6 @@ export default function VideoAutomation() {
   // Testing pulls its styles from a separate Creatomate account, so those never
   // appear in One Template / Multiple Templates.
   const [testingTemplates, setTestingTemplates] = useState<CreatomateTemplate[]>([]);
-  const [selectedCreatomateId, setSelectedCreatomateId] = useState<string | null>(null);
   // MT needs one style per selected sheet-template, keyed by that template's row key.
   const [mtCreatomateStyles, setMtCreatomateStyles] = useState<Record<string, string>>({});
 
@@ -213,6 +213,11 @@ export default function VideoAutomation() {
   // fail with "template not found".
   const allMtStylesAssigned  = selectedTemplateNames.length > 0 && selectedTemplateNames.every(
     tKey => galleryTemplates.some(t => t.template_id === mtCreatomateStyles[tKey])
+  );
+  // One Template: each selected client picks its own style, so every one of them
+  // needs an id that still resolves in the current pool before a run can start.
+  const allOtStylesAssigned  = selectedClientNames.length > 0 && selectedClientNames.every(
+    name => galleryTemplates.some(t => t.template_id === selectedClients[name].creatomateTemplateId)
   );
 
   useEffect(() => {
@@ -272,8 +277,12 @@ export default function VideoAutomation() {
   // (the keys existed) while the lookup at submit time found nothing, and n8n was
   // handed creatomate_template_id: null — "template not found".
   useEffect(() => {
-    setSelectedCreatomateId(null);
     setMtCreatomateStyles({});
+    setSelectedClients(prev => {
+      const next: Record<string, ClientEntry> = {};
+      for (const [name, entry] of Object.entries(prev)) next[name] = { ...entry, creatomateTemplateId: "" };
+      return next;
+    });
   }, [mode]);
 
   const toggleClient = (name: string) => {
@@ -284,7 +293,7 @@ export default function VideoAutomation() {
         if (activeClient === name) setActiveClient(null);
         return next;
       }
-      return { ...prev, [name]: { property: allProperties[name]?.[0] ?? "", openingHook: "", cta: "", comment: "" } };
+      return { ...prev, [name]: { property: allProperties[name]?.[0] ?? "", openingHook: "", cta: "", comment: "", creatomateTemplateId: "" } };
     });
   };
 
@@ -295,7 +304,7 @@ export default function VideoAutomation() {
   const selectAll = () => {
     const next: Record<string, ClientEntry> = {};
     clientNames.forEach(n => {
-      next[n] = selectedClients[n] ?? { property: allProperties[n]?.[0] ?? "", openingHook: "", cta: "", comment: "" };
+      next[n] = selectedClients[n] ?? { property: allProperties[n]?.[0] ?? "", openingHook: "", cta: "", comment: "", creatomateTemplateId: "" };
     });
     setSelectedClients(next);
   };
@@ -348,19 +357,26 @@ export default function VideoAutomation() {
     setJobStatuses([]);
     setStep("running");
     setErrMsg(null);
-    const selectedCreatomateTemplate = galleryTemplates.find(t => t.template_id === selectedCreatomateId) ?? null;
     const payload =
       mode === "one_template"
         ? {
             run_id: newRunId,
             mode: "one_template",
             template: rows.find(r => r[fileKey] === otTemplate) ?? null,
-            clients: Object.entries(selectedClients).map(([clientName, entry]) => ({ clientName, ...entry })),
-            creatomate_template_id:    selectedCreatomateTemplate?.template_id ?? null,
-            creatomate_video_element:  selectedCreatomateTemplate?.video_element_name ?? null,
-            creatomate_text_element:   selectedCreatomateTemplate?.text_element_name ?? null,
-            creatomate_text_element_2: selectedCreatomateTemplate?.text_element_2_name ?? null,
-            creatomate_caption_element: selectedCreatomateTemplate?.text_element_3_name ?? null,
+            // Each client carries its own Creatomate style now — not a single style
+            // shared across the whole run — since every client picks independently.
+            clients: Object.entries(selectedClients).map(([clientName, entry]) => {
+              const style = galleryTemplates.find(t => t.template_id === entry.creatomateTemplateId) ?? null;
+              return {
+                clientName,
+                ...entry,
+                creatomate_template_id:    style?.template_id ?? null,
+                creatomate_video_element:  style?.video_element_name ?? null,
+                creatomate_text_element:   style?.text_element_name ?? null,
+                creatomate_text_element_2: style?.text_element_2_name ?? null,
+                creatomate_caption_element: style?.text_element_3_name ?? null,
+              };
+            }),
           }
         : {
             run_id: newRunId,
@@ -695,7 +711,7 @@ export default function VideoAutomation() {
                             style={{ background: isActive ? "rgba(37,99,235,0.08)" : checked ? "rgba(37,99,235,0.03)" : "transparent" }}
                             onClick={() => {
                               if (!checked) {
-                                setSelectedClients(prev => ({ ...prev, [name]: { property: allProperties[name]?.[0] ?? "", openingHook: "", cta: "", comment: "" } }));
+                                setSelectedClients(prev => ({ ...prev, [name]: { property: allProperties[name]?.[0] ?? "", openingHook: "", cta: "", comment: "", creatomateTemplateId: "" } }));
                               }
                               setActiveClient(name);
                             }}
@@ -764,6 +780,24 @@ export default function VideoAutomation() {
                           </select>
                         </div>
 
+                        {/* Template Style — each client picks its own, required before running */}
+                        <div>
+                          <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>Template Style</p>
+                          <select
+                            value={selectedClients[activeClient].creatomateTemplateId}
+                            onChange={e => updateEntry(activeClient, "creatomateTemplateId", e.target.value)}
+                            className="w-full rounded-[8px] px-3 py-2.5 text-[13px] outline-none cursor-pointer"
+                            style={{ ...inputStyle, border: `1px solid ${selectedClients[activeClient].creatomateTemplateId ? "var(--border)" : "#EF4444"}` }}
+                            onFocus={focusBorder}
+                            onBlur={blurBorder}
+                          >
+                            <option value="" disabled>Select a template style…</option>
+                            {galleryTemplates.map(t => (
+                              <option key={t.template_id} value={t.template_id}>{t.template_name}</option>
+                            ))}
+                          </select>
+                        </div>
+
                         <div>
                           <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>Opening Hook</p>
                           <textarea
@@ -820,7 +854,7 @@ export default function VideoAutomation() {
                           <span style={{ fontSize: 18 }}>👈</span>
                         </div>
                         <p className="text-[13px] font-medium" style={{ color: "var(--muted)" }}>Click a client to configure</p>
-                        <p className="text-[11px]" style={{ color: "var(--muted)", opacity: 0.6 }}>Set property, hook, CTA & comment per client</p>
+                        <p className="text-[11px]" style={{ color: "var(--muted)", opacity: 0.6 }}>Set property, template style, hook, CTA & comment per client</p>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -856,56 +890,44 @@ export default function VideoAutomation() {
                 {errMsg && <p className="text-[11px]" style={{ color: "#EF4444" }}>{errMsg}</p>}
 
                 <div className="flex gap-2">
-                  <button onClick={handleSubmit} disabled={videosToGenerate === 0 || !selectedCreatomateId} className="w-full py-3 rounded-[10px] text-[12px] font-bold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed" style={{ background: ACTIVE_COLOR, color: "#fff", boxShadow: `0 0 16px ${ACTIVE_GLOW}`, border: "none" }}>
+                  <button onClick={handleSubmit} disabled={videosToGenerate === 0 || !allOtStylesAssigned} className="w-full py-3 rounded-[10px] text-[12px] font-bold cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed" style={{ background: ACTIVE_COLOR, color: "#fff", boxShadow: `0 0 16px ${ACTIVE_GLOW}`, border: "none" }}>
                     Run automation →
                   </button>
                 </div>
-                {videosToGenerate > 0 && !selectedCreatomateId && (
-                  <p className="text-[11px]" style={{ color: "#EF4444" }}>Pick a template style below before running.</p>
+                {videosToGenerate > 0 && !allOtStylesAssigned && (
+                  <p className="text-[11px]" style={{ color: "#EF4444" }}>Pick a template style for every selected client.</p>
                 )}
               </div>
 
             </div>
 
-            {/* Creatomate template gallery — pick which render template this run uses */}
+            {/* Creatomate template reference — selection now happens per-client/per-row via
+                dropdowns above, so this is a visual browse-only reference, not a selector. */}
             {galleryTemplates.length > 0 && (
               <div className="mt-6">
                 <p className="text-[11px] font-semibold tracking-widest uppercase mb-3" style={{ color: "var(--muted)" }}>
                   Template Styles
                 </p>
                 <div className="flex flex-wrap gap-3">
-                  {galleryTemplates.map(t => {
-                    const isSelected = selectedCreatomateId === t.template_id;
-                    return (
-                      <button
-                        key={t.template_id}
-                        onClick={() => setSelectedCreatomateId(isSelected ? null : t.template_id)}
-                        className="rounded-xl overflow-hidden text-left cursor-pointer flex-shrink-0"
-                        style={{
-                          width: 190,
-                          background: "var(--surface)",
-                          border: `1.5px solid ${isSelected ? ACTIVE_COLOR : "var(--border)"}`,
-                          boxShadow: isSelected ? `0 0 16px ${ACTIVE_GLOW}` : "none",
-                          transition: "border-color 0.15s, box-shadow 0.15s",
-                        }}
-                      >
-                        <div className="w-full flex items-center justify-center relative" style={{ aspectRatio: "9 / 16", background: "var(--bg)" }}>
-                          {t.thumbnail_url ? (
-                            <img src={t.thumbnail_url} alt={t.template_name} className="w-full h-full object-cover" />
-                          ) : (
-                            <span style={{ color: "var(--muted)", fontSize: 26 }}>🎬</span>
-                          )}
-                          {isSelected && (
-                            <span className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold" style={{ background: ACTIVE_COLOR, color: "#fff" }}>✓</span>
-                          )}
-                        </div>
-                        <div className="px-3 py-2.5">
-                          <p className="text-[13px] font-bold truncate" style={{ color: "var(--text)" }}>{t.template_name}</p>
-                          <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>Edited {timeAgo(t.updated_at)}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
+                  {galleryTemplates.map(t => (
+                    <div
+                      key={t.template_id}
+                      className="rounded-xl overflow-hidden text-left flex-shrink-0"
+                      style={{ width: 190, background: "var(--surface)", border: "1.5px solid var(--border)" }}
+                    >
+                      <div className="w-full flex items-center justify-center relative" style={{ aspectRatio: "9 / 16", background: "var(--bg)" }}>
+                        {t.thumbnail_url ? (
+                          <img src={t.thumbnail_url} alt={t.template_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span style={{ color: "var(--muted)", fontSize: 26 }}>🎬</span>
+                        )}
+                      </div>
+                      <div className="px-3 py-2.5">
+                        <p className="text-[13px] font-bold truncate" style={{ color: "var(--text)" }}>{t.template_name}</p>
+                        <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>Edited {timeAgo(t.updated_at)}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -1255,45 +1277,33 @@ export default function VideoAutomation() {
 
             </div>
 
-            {/* Creatomate template gallery — pick which render template this run uses */}
+            {/* Creatomate template reference — selection now happens per-client/per-row via
+                dropdowns above, so this is a visual browse-only reference, not a selector. */}
             {galleryTemplates.length > 0 && (
               <div className="mt-6">
                 <p className="text-[11px] font-semibold tracking-widest uppercase mb-3" style={{ color: "var(--muted)" }}>
                   Template Styles
                 </p>
                 <div className="flex flex-wrap gap-3">
-                  {galleryTemplates.map(t => {
-                    const isSelected = selectedCreatomateId === t.template_id;
-                    return (
-                      <button
-                        key={t.template_id}
-                        onClick={() => setSelectedCreatomateId(isSelected ? null : t.template_id)}
-                        className="rounded-xl overflow-hidden text-left cursor-pointer flex-shrink-0"
-                        style={{
-                          width: 190,
-                          background: "var(--surface)",
-                          border: `1.5px solid ${isSelected ? ACTIVE_COLOR : "var(--border)"}`,
-                          boxShadow: isSelected ? `0 0 16px ${ACTIVE_GLOW}` : "none",
-                          transition: "border-color 0.15s, box-shadow 0.15s",
-                        }}
-                      >
-                        <div className="w-full flex items-center justify-center relative" style={{ aspectRatio: "9 / 16", background: "var(--bg)" }}>
-                          {t.thumbnail_url ? (
-                            <img src={t.thumbnail_url} alt={t.template_name} className="w-full h-full object-cover" />
-                          ) : (
-                            <span style={{ color: "var(--muted)", fontSize: 26 }}>🎬</span>
-                          )}
-                          {isSelected && (
-                            <span className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold" style={{ background: ACTIVE_COLOR, color: "#fff" }}>✓</span>
-                          )}
-                        </div>
-                        <div className="px-3 py-2.5">
-                          <p className="text-[13px] font-bold truncate" style={{ color: "var(--text)" }}>{t.template_name}</p>
-                          <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>Edited {timeAgo(t.updated_at)}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
+                  {galleryTemplates.map(t => (
+                    <div
+                      key={t.template_id}
+                      className="rounded-xl overflow-hidden text-left flex-shrink-0"
+                      style={{ width: 190, background: "var(--surface)", border: "1.5px solid var(--border)" }}
+                    >
+                      <div className="w-full flex items-center justify-center relative" style={{ aspectRatio: "9 / 16", background: "var(--bg)" }}>
+                        {t.thumbnail_url ? (
+                          <img src={t.thumbnail_url} alt={t.template_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span style={{ color: "var(--muted)", fontSize: 26 }}>🎬</span>
+                        )}
+                      </div>
+                      <div className="px-3 py-2.5">
+                        <p className="text-[13px] font-bold truncate" style={{ color: "var(--text)" }}>{t.template_name}</p>
+                        <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>Edited {timeAgo(t.updated_at)}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
