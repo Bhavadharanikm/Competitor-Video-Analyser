@@ -110,13 +110,24 @@ function parseTimestampSegments(raw: string): TimestampSegment[] {
     const body = (parts[i + 1] ?? "").trim();
     const [beforePipe, ...rest] = body.split("|");
     const afterPipe = rest.join("|").trim();
-    const overlayMatch = afterPipe.match(/Text overlay(?:\s+reads)?:\s*"([^"]*)"/i);
-    const description = overlayMatch ? afterPipe.slice(0, overlayMatch.index).trim() : afterPipe;
+    // Some segments carry more than one quoted overlay phrase back-to-back after a
+    // single "Text overlay:" label (e.g. "I just need some air." "The air:") — grab
+    // every quoted phrase from that point on, not just the first, or the rest gets
+    // silently dropped.
+    const labelMatch = afterPipe.match(/Text overlay(?:\s+reads)?:/i);
+    let description = afterPipe;
+    let overlay: string | null = null;
+    if (labelMatch) {
+      description = afterPipe.slice(0, labelMatch.index).trim();
+      const overlaySection = afterPipe.slice(labelMatch.index! + labelMatch[0].length);
+      const quotes = Array.from(overlaySection.matchAll(/"([^"]*)"/g)).map(m => m[1]);
+      overlay = quotes.length > 0 ? quotes.join(" ") : null;
+    }
     segments.push({
       time,
       tags: beforePipe.trim(),
       description,
-      overlay: overlayMatch ? overlayMatch[1] : null,
+      overlay,
     });
   }
   return segments;
