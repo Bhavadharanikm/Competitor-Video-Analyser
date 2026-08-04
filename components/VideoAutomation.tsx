@@ -15,6 +15,7 @@ interface ClientEntry {
   property:    string;
   openingHook: string;
   cta:         string;
+  comment:     string;
 }
 
 interface ReelJob {
@@ -167,6 +168,7 @@ export default function VideoAutomation() {
   const [selectedTemplates, setSelectedTemplates] = useState<Record<string, boolean>>({});
   const [mtHook, setMtHook]                       = useState("");
   const [mtCta, setMtCta]                         = useState("");
+  const [mtComment, setMtComment]                 = useState("");
 
   const [detailRow, setDetailRow] = useState<SheetRow | null>(null);
   const [step, setStep]       = useState<Step>("idle");
@@ -271,7 +273,7 @@ export default function VideoAutomation() {
         if (activeClient === name) setActiveClient(null);
         return next;
       }
-      return { ...prev, [name]: { property: allProperties[name]?.[0] ?? "", openingHook: "", cta: "" } };
+      return { ...prev, [name]: { property: allProperties[name]?.[0] ?? "", openingHook: "", cta: "", comment: "" } };
     });
   };
 
@@ -282,7 +284,7 @@ export default function VideoAutomation() {
   const selectAll = () => {
     const next: Record<string, ClientEntry> = {};
     clientNames.forEach(n => {
-      next[n] = selectedClients[n] ?? { property: allProperties[n]?.[0] ?? "", openingHook: "", cta: "" };
+      next[n] = selectedClients[n] ?? { property: allProperties[n]?.[0] ?? "", openingHook: "", cta: "", comment: "" };
     });
     setSelectedClients(next);
   };
@@ -369,6 +371,7 @@ export default function VideoAutomation() {
             }),
             openingHook: mtHook,
             cta: mtCta,
+            comment: mtComment,
           };
     // Start polling immediately — don't wait for the webhook to respond.
     // n8n webhooks can be long-running and block until the workflow finishes,
@@ -404,6 +407,7 @@ export default function VideoAutomation() {
     setPollError(null);
     setMtHook("");
     setMtCta("");
+    setMtComment("");
   };
 
   const handleClose = () => {
@@ -680,7 +684,7 @@ export default function VideoAutomation() {
                             style={{ background: isActive ? "rgba(37,99,235,0.08)" : checked ? "rgba(37,99,235,0.03)" : "transparent" }}
                             onClick={() => {
                               if (!checked) {
-                                setSelectedClients(prev => ({ ...prev, [name]: { property: allProperties[name]?.[0] ?? "", openingHook: "", cta: "" } }));
+                                setSelectedClients(prev => ({ ...prev, [name]: { property: allProperties[name]?.[0] ?? "", openingHook: "", cta: "", comment: "" } }));
                               }
                               setActiveClient(name);
                             }}
@@ -776,6 +780,21 @@ export default function VideoAutomation() {
                             onBlur={blurBorder}
                           />
                         </div>
+
+                        {/* Comment — freeform note passed to the AI via the webhook, e.g. tone/style guidance */}
+                        <div>
+                          <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>Comment</p>
+                          <textarea
+                            value={selectedClients[activeClient].comment}
+                            onChange={e => updateEntry(activeClient, "comment", e.target.value)}
+                            placeholder="Any comment for the AI…"
+                            rows={3}
+                            className="w-full rounded-[8px] px-3 py-2.5 text-[13px] outline-none resize-none"
+                            style={inputStyle}
+                            onFocus={focusBorder}
+                            onBlur={blurBorder}
+                          />
+                        </div>
                       </motion.div>
                     ) : (
                       <motion.div
@@ -790,7 +809,7 @@ export default function VideoAutomation() {
                           <span style={{ fontSize: 18 }}>👈</span>
                         </div>
                         <p className="text-[13px] font-medium" style={{ color: "var(--muted)" }}>Click a client to configure</p>
-                        <p className="text-[11px]" style={{ color: "var(--muted)", opacity: 0.6 }}>Set property, hook & CTA per client</p>
+                        <p className="text-[11px]" style={{ color: "var(--muted)", opacity: 0.6 }}>Set property, hook, CTA & comment per client</p>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -1163,6 +1182,21 @@ export default function VideoAutomation() {
                     onChange={e => setMtCta(e.target.value)}
                     placeholder="CTA…"
                     className="w-full rounded-[8px] px-3 py-2.5 text-[13px] outline-none"
+                    style={inputStyle}
+                    onFocus={focusBorder}
+                    onBlur={blurBorder}
+                  />
+                </div>
+
+                {/* Comment — freeform note passed to the AI via the webhook, e.g. tone/style guidance */}
+                <div>
+                  <p className="text-[10px] font-semibold tracking-widest uppercase mb-1.5" style={{ color: "var(--muted)" }}>Comment <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span></p>
+                  <textarea
+                    value={mtComment}
+                    onChange={e => setMtComment(e.target.value)}
+                    placeholder="Any comment for the AI…"
+                    rows={3}
+                    className="w-full rounded-[8px] px-3 py-2.5 text-[13px] outline-none resize-none"
                     style={inputStyle}
                     onFocus={focusBorder}
                     onBlur={blurBorder}
