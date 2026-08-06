@@ -26,8 +26,10 @@ const HIDDEN_PROPERTIES: Record<string, string[]> = {
 // { "FLOHOM": ["FLO15", "FLO16", ...], "Awayframes": [...] }
 export async function GET() {
   try {
-    const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    // Client/property data now lives in the separate "major client analysis"
+    // Supabase project, not the Reel_Jobs/growth-jobs one.
+    const url = process.env.CLIENT_ANALYSIS_SUPABASE_URL;
+    const key = process.env.CLIENT_ANALYSIS_SUPABASE_SERVICE_KEY;
 
     if (!url || !key) {
       return NextResponse.json({ error: "Supabase env vars missing" }, { status: 500 });
