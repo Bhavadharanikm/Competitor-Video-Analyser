@@ -185,7 +185,8 @@ export default function ComposePage() {
                 />
               </div>
               <div className="flex-1">
-                <input type="text" value={mediaUrl} onChange={e => setMediaUrl(e.target.value)} placeholder="https://… (Google Drive video/image link)" className="w-full rounded-[8px] px-3 py-2.5 text-[13px] outline-none" style={inputStyle} />
+                <input type="text" value={mediaUrl} onChange={e => setMediaUrl(e.target.value)} placeholder="https://… (Google Drive, Creatomate, or any direct video/image link)" className="w-full rounded-[8px] px-3 py-2.5 text-[13px] outline-none" style={inputStyle} />
+                <p className="text-[11px] mt-1.5" style={{ color: "var(--muted)" }}>Paste a Google Drive share link, or a direct video/image URL (e.g. a Creatomate render link) — both work.</p>
               </div>
             </div>
           </div>
